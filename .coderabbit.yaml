@@ -14,7 +14,14 @@ reviews:
   enable_prompt_for_ai_agents: true
   in_progress_fortune: false
   high_level_summary_in_walkthrough: true
-  
+  estimate_code_review_effort: false
+  related_issues: false
+  related_prs: false
+  suggested_labels: false
+  suggested_reviewers: false
+  changed_files_summary: false
+  assess_linked_issues: false
+
   auto_review:
     enabled: true
     auto_incremental_review: true
@@ -25,4 +32,87 @@ reviews:
       - "DRAFT"
     # Release Please が生成する PR をレビュー対象外にする
     labels:
-    - "!autorelease: pending"
+      - "!autorelease: pending"
+
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+
+chat:
+  art: false
+
+knowledge_base:
+  web_search:
+    enabled: false
+
+tools:
+  shellcheck:
+    enabled: true
+  actionlint:
+    enabled: true
+  gitleaks:
+    enabled: true
+  yamllint:
+    enabled: true
+  markdownlint:
+    enabled: true
+  github-checks:
+    enabled: true
+  languagetool:
+    enabled: true
+  ast-grep:
+    enabled: false
+  biome:
+    enabled: false
+  buf:
+    enabled: false
+  checkov:
+    enabled: false
+  clippy:
+    enabled: false
+  cppcheck:
+    enabled: false
+  detekt:
+    enabled: false
+  eslint:
+    enabled: false
+  flake8:
+    enabled: false
+  golangci-lint:
+    enabled: false
+  hadolint:
+    enabled: false
+  ktlint:
+    enabled: false
+  luacheck:
+    enabled: false
+  mypy:
+    enabled: false
+  phpstan:
+    enabled: false
+  pmd:
+    enabled: false
+  prisma-lint:
+    enabled: false
+  pylint:
+    enabled: false
+  regal:
+    enabled: false
+  rubocop:
+    enabled: false
+  ruff:
+    enabled: false
+  semgrep:
+    enabled: false
+  shopify-theme-check:
+    enabled: false
+  sqlfluff:
+    enabled: false
+  stylelint:
+    enabled: false
+  swiftlint:
+    enabled: false
+  terraform-fmt:
+    enabled: false

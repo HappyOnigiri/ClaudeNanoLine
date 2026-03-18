@@ -39,7 +39,10 @@ updated=$(echo "$original" | STATUS_LINE_ENTRY="$STATUS_LINE_ENTRY" python3 -c "
 import json, sys, os
 orig = json.loads(sys.stdin.read())
 patch = json.loads(os.environ['STATUS_LINE_ENTRY'])
-orig.update(patch)
+orig.setdefault('statusLine', {}).update(patch.get('statusLine', {}))
+for k, v in patch.items():
+    if k != 'statusLine':
+        orig[k] = v
 print(json.dumps(orig, indent=2))
 ")
 

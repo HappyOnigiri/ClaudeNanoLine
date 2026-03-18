@@ -100,15 +100,20 @@ Git Bash または WSL 上で動作します。自動インストール・手動
 
 ### オプション一覧
 
-| key               | 対象      | 値                         | 説明                       |
-| ----------------- | --------- | -------------------------- | -------------------------- |
-| `color`           | 全て      | 色名                       | 表示色                     |
-| `warn-color`      | `*_pct`   | 色名                       | 警告時の色                 |
-| `alert-color`     | `*_pct`   | 色名                       | 危険時の色                 |
-| `warn-threshold`  | `*_pct`   | 数値                       | 警告しきい値（%）          |
-| `alert-threshold` | `*_pct`   | 数値                       | 危険しきい値（%）          |
-| `format`          | `*_reset` | `auto`/`hm`/`h1`/`dh`/`d1` | 時間フォーマット           |
-| `format`          | `*_pct`   | `pct`/`pct1`               | パーセンテージフォーマット |
+| key               | 対象      | 値                         | デフォルト | 説明                                                            |
+| ----------------- | --------- | -------------------------- | ---------- | --------------------------------------------------------------- |
+| `color`           | 全て      | 色名                       | なし       | 表示色                                                          |
+| `warn-color`      | `*_pct`   | 色名                       | `yellow`   | 警告時の色                                                      |
+| `alert-color`     | `*_pct`   | 色名                       | `red`      | 危険時の色                                                      |
+| `warn-threshold`  | `*_pct`   | 数値                       | `80`       | 警告しきい値（%）                                               |
+| `alert-threshold` | `*_pct`   | 数値                       | `95`       | 危険しきい値（%）                                               |
+| `format`          | `*_pct`   | `pct` / `pctN`             | `pct`      | 小数桁数指定（例: `pct2` → `42.73%`）                           |
+| `format`          | `*_reset` | `auto`/`hm`/`h1`/`dh`/`d1` | `auto`     | 時間フォーマット（従来オプション）                              |
+| `unit`            | `*_reset` | `auto` / `h` / `d` / `dh`  | `auto`     | 表示単位（`h`=時間固定, `d`=日固定, `dh`=日+時間, `auto`=自動） |
+| `digits`          | `*_reset` | 数値                       | `1`        | 小数桁数（例: `digits:2` → `2.50h`）                            |
+| `haiku-color`     | `model`   | 色名                       | `amber`    | Haiku モデル時の色                                              |
+| `sonnet-color`    | `model`   | 色名                       | `sky_blue` | Sonnet モデル時の色                                             |
+| `opus-color`      | `model`   | 色名                       | `pink`     | Opus モデル時の色                                               |
 
 ### 使用可能な色名
 
@@ -123,8 +128,14 @@ export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {7d_pct} {model}"
 # カスタム色・しきい値
 export CLAUDE_NANO_LINE_FORMAT="{text:[5h]|color:cyan} {5h_pct|warn-threshold:70,alert-threshold:90} {model}"
 
-# 小数表示 + 時間フォーマット固定
-export CLAUDE_NANO_LINE_FORMAT="{5h_pct|format:pct1} {text:(}{5h_reset|format:hm}{text:)} {model}"
+# 小数2桁表示 + リセット時間を時間単位・小数2桁で表示
+export CLAUDE_NANO_LINE_FORMAT="{5h_pct|format:pct2} {text:(}{5h_reset|unit:h,digits:2}{text:)} {model}"
+
+# リセット時間を日+時間で整数表示
+export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {text:(}{5h_reset|unit:dh,digits:0}{text:)} {7d_pct} {model}"
+
+# モデルごとに色を変える
+export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {model|haiku-color:green,sonnet-color:yellow,opus-color:blue} {cwd}"
 
 # セパレータ付き
 export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {text:|} {7d_pct} {text:|} {model} {cwd}"

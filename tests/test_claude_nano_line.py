@@ -105,10 +105,20 @@ class TestFmtResetTime(unittest.TestCase):
         result = cnl.fmt_reset_time(iso)
         self.assertEqual(result, "15h30m")
 
-    def test_auto_over_24h(self):
-        iso = self._iso(36 * 3600)  # 36時間後
+    def test_auto_1d_to_2d(self):
+        iso = self._iso(36 * 3600)  # 36時間後 = 1d12h
         result = cnl.fmt_reset_time(iso)
-        self.assertEqual(result, "1d")
+        self.assertEqual(result, "1d12h")
+
+    def test_auto_over_2d(self):
+        iso = self._iso(3 * 86400)  # 3日後
+        result = cnl.fmt_reset_time(iso)
+        self.assertEqual(result, "3d")
+
+    def test_auto_exactly_2d(self):
+        iso = self._iso(2 * 86400)  # ちょうど2日後
+        result = cnl.fmt_reset_time(iso)
+        self.assertEqual(result, "2d")
 
     def test_fmt_hm(self):
         iso = self._iso(int(2.5 * 3600))  # 2.5時間後 = 2h30m
@@ -821,6 +831,195 @@ class TestMainIntegration(unittest.TestCase):
                             cnl.main()
                         out = captured.getvalue()
         self.assertIsInstance(out, str)
+
+
+# ── Feature 1: format:pctN ─────────────────────────────────────────────────────
+class TestPctN(unittest.TestCase):
+    def _usage(self, five=42.73):
+        return {
+            "five_hour_pct": int(five),
+            "five_hour_pct_raw": float(five),
+            "seven_day_pct": -1,
+            "seven_day_pct_raw": -1.0,
+            "five_resets_at": "",
+            "seven_resets_at": "",
+        }
+
+    def _render(self, fmt, usage=None):
+        if usage is None:
+            usage = self._usage()
+        return strip_ansi(cnl.render_custom(fmt, None, usage, "sonnet", "", ""))
+
+    def test_pct0_returns_integer(self):
+        self.assertEqual(self._render("{5h_pct|format:pct0}"), "42%")
+
+    def test_pct1_returns_one_decimal(self):
+        self.assertEqual(self._render("{5h_pct|format:pct1}"), "42.7%")
+
+    def test_pct2_returns_two_decimals(self):
+        self.assertEqual(self._render("{5h_pct|format:pct2}"), "42.73%")
+
+    def test_pct_default_returns_integer(self):
+        self.assertEqual(self._render("{5h_pct}"), "42%")
+
+    def test_pct2_no_raw_falls_back_to_int(self):
+        usage = {
+            "five_hour_pct": 42,
+            "five_hour_pct_raw": -1.0,
+            "seven_day_pct": -1,
+            "seven_day_pct_raw": -1.0,
+            "five_resets_at": "",
+            "seven_resets_at": "",
+        }
+        self.assertEqual(self._render("{5h_pct|format:pct2}", usage=usage), "42%")
+
+
+# ── Feature 2: fmt_reset_time_v2 ───────────────────────────────────────────────
+class TestFmtResetTimeV2(unittest.TestCase):
+    def _iso(self, seconds_from_now):
+        dt = datetime.now(timezone.utc) + timedelta(seconds=seconds_from_now)
+        return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def test_unit_h_digits1(self):
+        iso = self._iso(9000)  # 2.5h
+        result = cnl.fmt_reset_time_v2(iso, unit="h", digits=1)
+        self.assertRegex(result, r"^\d+\.\d{1}h$")
+
+    def test_unit_h_digits0(self):
+        iso = self._iso(9000)
+        result = cnl.fmt_reset_time_v2(iso, unit="h", digits=0)
+        self.assertRegex(result, r"^\d+h$")
+
+    def test_unit_d_digits1(self):
+        iso = self._iso(129600)  # 1.5d
+        result = cnl.fmt_reset_time_v2(iso, unit="d", digits=1)
+        self.assertRegex(result, r"^\d+\.\d{1}d$")
+
+    def test_unit_d_digits0(self):
+        iso = self._iso(129600)
+        result = cnl.fmt_reset_time_v2(iso, unit="d", digits=0)
+        self.assertRegex(result, r"^\d+d$")
+
+    def test_unit_dh_digits1(self):
+        iso = self._iso(97200)  # 1d 3h
+        result = cnl.fmt_reset_time_v2(iso, unit="dh", digits=1)
+        self.assertRegex(result, r"^\d+d \d+\.\d{1}h$")
+
+    def test_unit_dh_digits0(self):
+        iso = self._iso(97200)
+        result = cnl.fmt_reset_time_v2(iso, unit="dh", digits=0)
+        self.assertRegex(result, r"^\d+d \d+h$")
+
+    def test_unit_auto_minutes(self):
+        iso = self._iso(1800)  # 30m
+        result = cnl.fmt_reset_time_v2(iso, unit="auto", digits=1)
+        self.assertRegex(result, r"^\d+m$")
+
+    def test_unit_auto_hours(self):
+        iso = self._iso(7200)  # 2h
+        result = cnl.fmt_reset_time_v2(iso, unit="auto", digits=1)
+        self.assertRegex(result, r"^\d+\.\d+h$")
+
+    def test_unit_auto_1d_to_2d(self):
+        iso = self._iso(36 * 3600)  # 36時間後 → 1dXh 形式
+        result = cnl.fmt_reset_time_v2(iso, unit="auto", digits=1)
+        self.assertRegex(result, r"^1d\d+h$")
+
+    def test_unit_auto_over_2d(self):
+        iso = self._iso(3 * 86400)  # 3日後 → Xd 形式
+        result = cnl.fmt_reset_time_v2(iso, unit="auto", digits=1)
+        self.assertRegex(result, r"^\d+d$")
+
+    def test_unit_auto_exactly_2d(self):
+        iso = self._iso(2 * 86400 + 60)  # 2日+1分後 → 2d 形式
+        result = cnl.fmt_reset_time_v2(iso, unit="auto", digits=1)
+        self.assertEqual(result, "2d")
+
+    def test_empty_iso_returns_empty(self):
+        self.assertEqual(cnl.fmt_reset_time_v2("", unit="h", digits=1), "")
+
+    def test_past_time_returns_empty(self):
+        iso = self._iso(-100)
+        self.assertEqual(cnl.fmt_reset_time_v2(iso, unit="h", digits=1), "")
+
+
+# ── Feature 2: reset unit/digits dispatch via render_custom ───────────────────
+class TestResetDispatch(unittest.TestCase):
+    def _iso(self, seconds_from_now):
+        dt = datetime.now(timezone.utc) + timedelta(seconds=seconds_from_now)
+        return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def _usage(self, secs):
+        return {
+            "five_hour_pct": 50,
+            "five_hour_pct_raw": 50.0,
+            "seven_day_pct": 50,
+            "seven_day_pct_raw": 50.0,
+            "five_resets_at": self._iso(secs),
+            "seven_resets_at": self._iso(secs),
+        }
+
+    def _render(self, fmt, secs):
+        return strip_ansi(cnl.render_custom(fmt, None, self._usage(secs), "sonnet", "", ""))
+
+    def test_unit_opt_uses_v2(self):
+        val = self._render("{5h_reset|unit:h,digits:2}", 9000)
+        self.assertRegex(val, r"^\d+\.\d{2}h$")
+
+    def test_digits_opt_uses_v2(self):
+        # auto unit, digits=0, 9000s=2.5h → <10h なので時間表示、整数
+        val = self._render("{5h_reset|digits:0}", 9000)
+        self.assertRegex(val, r"^\d+h$")
+
+    def test_no_opts_uses_legacy(self):
+        val = self._render("{5h_reset}", 9000)
+        self.assertGreater(len(val), 0)
+
+    def test_format_opt_uses_legacy(self):
+        val = self._render("{5h_reset|format:h1}", 9000)
+        self.assertRegex(val, r"^\d+\.\d+h$")
+
+
+# ── Feature 3: model per-model color ──────────────────────────────────────────
+class TestModelPerModelColor(unittest.TestCase):
+    _USAGE = {
+        "five_hour_pct": 50,
+        "five_hour_pct_raw": 50.0,
+        "seven_day_pct": 50,
+        "seven_day_pct_raw": 50.0,
+        "five_resets_at": "",
+        "seven_resets_at": "",
+    }
+
+    def _render(self, fmt, model):
+        return cnl.render_custom(fmt, None, self._USAGE, model, "", "")
+
+    def test_haiku_color(self):
+        out = self._render("{model|haiku-color:green}", "claude-haiku-4-5")
+        self.assertIn(cnl.COLOR_MAP["green"], out)
+
+    def test_sonnet_color(self):
+        out = self._render("{model|sonnet-color:cyan}", "claude-sonnet-4-6")
+        self.assertIn(cnl.COLOR_MAP["cyan"], out)
+
+    def test_opus_color(self):
+        out = self._render("{model|opus-color:pink}", "claude-opus-4-6")
+        self.assertIn(cnl.COLOR_MAP["pink"], out)
+
+    def test_blanket_color_overrides_per_model(self):
+        out = self._render("{model|color:red,haiku-color:green}", "claude-haiku-4-5")
+        self.assertIn(cnl.COLOR_MAP["red"], out)
+        self.assertNotIn(cnl.COLOR_MAP["green"], out)
+
+    def test_haiku_color_not_applied_to_sonnet(self):
+        out = self._render("{model|haiku-color:green}", "claude-sonnet-4-6")
+        # haiku-color は sonnet に適用されない → デフォルト色 (sky_blue)
+        self.assertNotIn(cnl.COLOR_MAP["green"], out)
+        self.assertIn(cnl.COLOR_MAP["sky_blue"], out)
+
+    def test_unrecognized_model_falls_through_to_default(self):
+        out = self._render("{model|haiku-color:green}", "unknown-model-xyz")
+        self.assertNotIn(cnl.COLOR_MAP["green"], out)
 
 
 if __name__ == "__main__":

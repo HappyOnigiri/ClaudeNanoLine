@@ -1,4 +1,4 @@
-.PHONY: ci install repomix clean
+.PHONY: ci install repomix clean lint
 
 REPOMIX_VERSION ?= 1.12.0
 CLAUDE_DIR ?= $(HOME)/.claude

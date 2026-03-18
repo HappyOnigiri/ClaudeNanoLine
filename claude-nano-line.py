@@ -277,6 +277,7 @@ def fmt_reset_time_v2(iso_str, unit="auto", digits=1):
         secs = int((dt - datetime.now(timezone.utc)).total_seconds())
         if secs <= 0:
             return ""
+        digits = max(0, int(digits))
         fmt = f".{digits}f"
         if unit == "h":
             h = secs / 3600

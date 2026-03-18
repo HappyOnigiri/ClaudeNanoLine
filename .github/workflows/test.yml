@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install ruff
+
+      - name: Run CI
+        run: make ci
+
+      - name: Check for uncommitted changes (formatter diff)
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Formatter produced uncommitted changes:"
+            git diff
+            exit 1
+          fi

@@ -28,7 +28,11 @@ print(json.dumps(orig, indent=2)) \
 	echo "Updated $(SETTINGS_FILE)"
 
 ci:
-	python3 -m unittest discover -v tests/
+	python3 scripts/ci.py
+
+lint:
+	ruff format claude-nano-line.py tests/
+	ruff check claude-nano-line.py tests/ --fix
 
 repomix:
 	@mkdir -p tmp/repomix

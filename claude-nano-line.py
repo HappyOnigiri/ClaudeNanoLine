@@ -169,6 +169,10 @@ def fetch_usage(token):
         write_cache({"api_error": "unknown"})
         return {"api_error": "unknown"}
     except HTTPError as e:
+        if e.code == 429:
+            write_log("error:limit http_status=429")
+            write_cache({"api_error": "limit"})
+            return {"api_error": "limit"}
         write_log("error:unknown http_status=" + str(e.code))
         write_cache({"api_error": "unknown"})
         return {"api_error": "unknown"}

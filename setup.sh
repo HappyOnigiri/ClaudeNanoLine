@@ -35,10 +35,10 @@ else
   original="{}"
 fi
 
-updated=$(echo "$original" | python3 -c "
-import json, sys
+updated=$(echo "$original" | STATUS_LINE_ENTRY="$STATUS_LINE_ENTRY" python3 -c "
+import json, sys, os
 orig = json.loads(sys.stdin.read())
-patch = json.loads('$STATUS_LINE_ENTRY')
+patch = json.loads(os.environ['STATUS_LINE_ENTRY'])
 orig.update(patch)
 print(json.dumps(orig, indent=2))
 ")

@@ -391,8 +391,14 @@ def parse_options(opt_str):
 
 
 def get_threshold_color(pct_val, opts, warn_pct=DEFAULT_WARN_PCT, crit_pct=DEFAULT_CRIT_PCT):
-    warn = int(opts.get("warn-threshold", warn_pct))
-    alert = int(opts.get("alert-threshold", crit_pct))
+    try:
+        warn = int(opts.get("warn-threshold", warn_pct))
+    except (TypeError, ValueError):
+        warn = warn_pct
+    try:
+        alert = int(opts.get("alert-threshold", crit_pct))
+    except (TypeError, ValueError):
+        alert = crit_pct
     c_normal = opts.get("color", "green")
     c_warn = opts.get("warn-color", "yellow")
     c_alert = opts.get("alert-color", "red")

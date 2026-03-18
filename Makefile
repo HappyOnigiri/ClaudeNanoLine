@@ -1,5 +1,8 @@
 .PHONY: ci install repomix clean lint
 
+VENV := .venv
+VENV_SENTINEL := $(VENV)/.installed
+
 REPOMIX_VERSION ?= 1.12.0
 CLAUDE_DIR ?= $(HOME)/.claude
 DEST_SCRIPT ?= $(CLAUDE_DIR)/claude-nano-line.py
@@ -27,8 +30,13 @@ print(json.dumps(orig, indent=2)) \
 	printf '%s\n' "$$updated" > "$(SETTINGS_FILE)"; \
 	echo "Updated $(SETTINGS_FILE)"
 
-ci:
-	python3 scripts/ci.py
+$(VENV_SENTINEL): requirements-dev.txt
+	python3 -m venv $(VENV)
+	$(VENV)/bin/pip install -r requirements-dev.txt -q
+	touch $(VENV_SENTINEL)
+
+ci: $(VENV_SENTINEL)
+	PATH="$(CURDIR)/$(VENV)/bin:$(PATH)" python3 scripts/ci.py
 
 lint:
 	ruff format claude-nano-line.py tests/

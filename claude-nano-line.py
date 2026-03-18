@@ -348,7 +348,8 @@ def render_legacy(ctx_remaining, usage, model, cwd_base, git_branch):
             colorize("[ctx]", COLOR_MAP["gray"])
             + " "
             + usage_color(ctx_used, warn_pct, crit_pct)
-            + str(ctx_used) + "%"
+            + str(ctx_used)
+            + "%"
             + RESET
         )
 
@@ -370,30 +371,16 @@ def render_legacy(ctx_remaining, usage, model, cwd_base, git_branch):
         if not five_remaining:
             five_remaining = "5h"
         remaining_str = " " + COLOR_MAP["light_gray"] + "(" + five_remaining + ")" + RESET
-        five_part = (
-            colorize("[5h]", COLOR_MAP["gray"])
-            + " "
-            + col
-            + str(five_pct_val) + "%"
-            + RESET
-            + remaining_str
-        )
+        five_part = colorize("[5h]", COLOR_MAP["gray"]) + " " + col + str(five_pct_val) + "%" + RESET + remaining_str
 
         if seven_pct_val != -1:
             col = usage_color(seven_pct_val, warn_pct, crit_pct)
             seven_remaining = fmt_reset_time(usage.get("seven_resets_at", ""))
             remaining_str = ""
             if seven_remaining:
-                remaining_str = (
-                    " " + COLOR_MAP["light_gray"] + "(" + seven_remaining + ")" + RESET
-                )
+                remaining_str = " " + COLOR_MAP["light_gray"] + "(" + seven_remaining + ")" + RESET
             seven_part = (
-                colorize("[7d]", COLOR_MAP["gray"])
-                + " "
-                + col
-                + str(seven_pct_val) + "%"
-                + RESET
-                + remaining_str
+                colorize("[7d]", COLOR_MAP["gray"]) + " " + col + str(seven_pct_val) + "%" + RESET + remaining_str
             )
         else:
             seven_part = COLOR_MAP["gray"] + "[7d] --%" + RESET
@@ -406,15 +393,7 @@ def render_legacy(ctx_remaining, usage, model, cwd_base, git_branch):
 
     # cwd part
     git_info = " (" + git_branch + ")" if git_branch else ""
-    cwd_part = (
-        COLOR_MAP["bold"]
-        + COLOR_MAP["yellow"]
-        + cwd_base
-        + RESET
-        + COLOR_MAP["cyan"]
-        + git_info
-        + RESET
-    )
+    cwd_part = COLOR_MAP["bold"] + COLOR_MAP["yellow"] + cwd_base + RESET + COLOR_MAP["cyan"] + git_info + RESET
 
     # assemble
     line = ctx_part
@@ -604,11 +583,7 @@ def main():
     except Exception:
         input_data = {}
 
-    cwd_real = (
-        (input_data.get("workspace") or {}).get("current_dir")
-        or input_data.get("cwd", "")
-        or ""
-    )
+    cwd_real = (input_data.get("workspace") or {}).get("current_dir") or input_data.get("cwd", "") or ""
     model = (input_data.get("model") or {}).get("display_name", "")
     ctx_remaining = (input_data.get("context_window") or {}).get("remaining_percentage")
 

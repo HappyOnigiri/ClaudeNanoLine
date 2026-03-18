@@ -5,7 +5,6 @@ import importlib.util
 import json
 import os
 import re
-import sys
 import tempfile
 import time
 import unittest
@@ -15,9 +14,7 @@ from unittest.mock import MagicMock, patch
 
 # ── Module loader ──────────────────────────────────────────────────────────────
 _REPO_DIR = Path(__file__).parent.parent
-spec = importlib.util.spec_from_file_location(
-    "claude_nano_line", _REPO_DIR / "claude-nano-line.py"
-)
+spec = importlib.util.spec_from_file_location("claude_nano_line", _REPO_DIR / "claude-nano-line.py")
 cnl = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cnl)
 
@@ -60,13 +57,18 @@ class TestFmtResetTime(unittest.TestCase):
         return (self.FIXED_NOW + timedelta(seconds=delta_seconds)).isoformat()
 
     def _patch_now(self):
-        return patch("claude_nano_line.datetime") if False else patch.object(
-            cnl, "datetime",
-            **{
-                "now.return_value": self.FIXED_NOW,
-                "fromisoformat.side_effect": datetime.fromisoformat,
-                "spec": datetime,
-            }
+        return (
+            patch("claude_nano_line.datetime")
+            if False
+            else patch.object(
+                cnl,
+                "datetime",
+                **{
+                    "now.return_value": self.FIXED_NOW,
+                    "fromisoformat.side_effect": datetime.fromisoformat,
+                    "spec": datetime,
+                },
+            )
         )
 
     def setUp(self):
@@ -351,8 +353,7 @@ class TestRenderLegacy(unittest.TestCase):
 
 # ── 9. TestRenderCustom ────────────────────────────────────────────────────────
 class TestRenderCustom(unittest.TestCase):
-    def _usage(self, five=42, seven=60, five_raw=42.7, seven_raw=60.0,
-               five_resets="", seven_resets="", api_error=""):
+    def _usage(self, five=42, seven=60, five_raw=42.7, seven_raw=60.0, five_resets="", seven_resets="", api_error=""):
         if api_error:
             return {"api_error": api_error}
         return {
@@ -477,12 +478,14 @@ class TestRenderCustom(unittest.TestCase):
         self.assertEqual(out, "")
 
     def test_combined_format(self):
-        out = strip_ansi(self._render(
-            "{5h_pct} {7d_pct} {model} {cwd}",
-            usage=self._usage(five=42, seven=60),
-            model="claude-sonnet-4",
-            cwd="/home/user/myproject",
-        ))
+        out = strip_ansi(
+            self._render(
+                "{5h_pct} {7d_pct} {model} {cwd}",
+                usage=self._usage(five=42, seven=60),
+                model="claude-sonnet-4",
+                cwd="/home/user/myproject",
+            )
+        )
         self.assertIn("42%", out)
         self.assertIn("60%", out)
         self.assertIn("claude-sonnet-4", out)
@@ -571,6 +574,7 @@ class TestCacheReadWrite(unittest.TestCase):
         self.patcher_dir.stop()
         self.patcher_file.stop()
         import shutil
+
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def test_write_and_read(self):
@@ -599,6 +603,7 @@ class TestCacheReadWrite(unittest.TestCase):
 
     def test_creates_dir(self):
         import shutil
+
         shutil.rmtree(self.tmpdir, ignore_errors=True)
         cnl.write_cache({"five_hour_pct": 10})
         self.assertTrue(self.tmp_cache_file.exists())
@@ -619,6 +624,7 @@ class TestWriteLog(unittest.TestCase):
         self.patcher_dir.stop()
         self.patcher_file.stop()
         import shutil
+
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def test_creates_file(self):
@@ -653,6 +659,7 @@ class TestFetchUsage(unittest.TestCase):
         self.patcher_file.stop()
         self.patcher_log.stop()
         import shutil
+
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def _mock_response(self, data):
@@ -684,18 +691,21 @@ class TestFetchUsage(unittest.TestCase):
 
     def test_url_error_timed_out(self):
         from urllib.error import URLError
+
         with patch.object(cnl, "urlopen", side_effect=URLError("timed out")):
             result = cnl.fetch_usage("mytoken")
         self.assertEqual(result, {"api_error": "timeout"})
 
     def test_url_error_other(self):
         from urllib.error import URLError
+
         with patch.object(cnl, "urlopen", side_effect=URLError("connection refused")):
             result = cnl.fetch_usage("mytoken")
         self.assertEqual(result, {"api_error": "unknown"})
 
     def test_http_error(self):
         from urllib.error import HTTPError
+
         with patch.object(cnl, "urlopen", side_effect=HTTPError("url", 403, "Forbidden", {}, None)):
             result = cnl.fetch_usage("mytoken")
         self.assertEqual(result, {"api_error": "unknown"})
@@ -765,6 +775,7 @@ class TestMainIntegration(unittest.TestCase):
 
     def _run_main(self, stdin_data, env=None):
         import io
+
         stdin_json = json.dumps(stdin_data)
         with patch("sys.stdin", io.StringIO(stdin_json)):
             with patch.object(cnl, "get_usage_data", return_value=self._USAGE):
@@ -808,6 +819,7 @@ class TestMainIntegration(unittest.TestCase):
 
     def test_invalid_json_stdin(self):
         import io
+
         with patch("sys.stdin", io.StringIO("not valid json{")):
             with patch.object(cnl, "get_usage_data", return_value=self._USAGE):
                 with patch.object(cnl, "get_git_branch", return_value=""):
@@ -822,6 +834,7 @@ class TestMainIntegration(unittest.TestCase):
 
     def test_empty_stdin(self):
         import io
+
         with patch("sys.stdin", io.StringIO("")):
             with patch.object(cnl, "get_usage_data", return_value=self._USAGE):
                 with patch.object(cnl, "get_git_branch", return_value=""):

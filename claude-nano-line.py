@@ -339,7 +339,7 @@ def fmt_reset_datetime(iso_str, fmt_type="auto", tz_local=True):
 
         # _tz サフィックスの判定・除去
         show_tz = fmt_type.endswith("_tz")
-        base_fmt = fmt_type.removesuffix("_tz") if show_tz else fmt_type
+        base_fmt = fmt_type[:-3] if show_tz else fmt_type
         tz_suffix = " " + dt.strftime("%Z") if show_tz else ""
 
         if base_fmt == "time":

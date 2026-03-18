@@ -287,7 +287,10 @@ def fmt_reset_time_v2(iso_str, unit="auto", digits=1):
             return f"{d:{fmt}}d"
         elif unit == "dh":
             d_int, rem = divmod(secs, 86400)
-            h = rem / 3600
+            h = round(rem / 3600, digits)
+            if h >= 24:
+                d_int += 1
+                h = 0.0
             return f"{d_int}d {h:{fmt}}h"
         else:  # auto
             if secs < 3600:

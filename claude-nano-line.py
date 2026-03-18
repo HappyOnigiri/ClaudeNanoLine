@@ -24,9 +24,12 @@ API_VERSION = "2023-06-01"
 API_BETA = "oauth-2025-04-20"
 
 # ── Paths ───────────────────────────────────────────────────────────────────────
-CACHE_DIR = Path.home() / ".claude" / "cache"
+_xdg_cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
+_xdg_state = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state")
+CACHE_DIR = _xdg_cache / "claude-nano-line"
 CACHE_FILE = CACHE_DIR / "claude-usage-cache.json"
-LOG_FILE = CACHE_DIR / "claude-usage-api.log"
+LOG_DIR = _xdg_state / "claude-nano-line"
+LOG_FILE = LOG_DIR / "claude-usage-api.log"
 
 # ── ANSI Colors ─────────────────────────────────────────────────────────────────
 RESET = "\033[0m"
@@ -125,7 +128,7 @@ def write_cache(data):
 
 def write_log(msg):
     try:
-        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
         with open(LOG_FILE, "a") as f:
             ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             f.write(ts + " " + msg + "\n")

@@ -613,9 +613,9 @@ class TestCacheReadWrite(unittest.TestCase):
 class TestWriteLog(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
-        self.tmp_cache_dir = Path(self.tmpdir)
-        self.tmp_log_file = self.tmp_cache_dir / "claude-usage-api.log"
-        self.patcher_dir = patch.object(cnl, "CACHE_DIR", self.tmp_cache_dir)
+        self.tmp_log_dir = Path(self.tmpdir)
+        self.tmp_log_file = self.tmp_log_dir / "claude-usage-api.log"
+        self.patcher_dir = patch.object(cnl, "LOG_DIR", self.tmp_log_dir)
         self.patcher_file = patch.object(cnl, "LOG_FILE", self.tmp_log_file)
         self.patcher_dir.start()
         self.patcher_file.start()
@@ -649,14 +649,17 @@ class TestFetchUsage(unittest.TestCase):
         self.tmp_cache_dir = Path(self.tmpdir)
         self.patcher_dir = patch.object(cnl, "CACHE_DIR", self.tmp_cache_dir)
         self.patcher_file = patch.object(cnl, "CACHE_FILE", self.tmp_cache_dir / "cache.json")
+        self.patcher_log_dir = patch.object(cnl, "LOG_DIR", self.tmp_cache_dir)
         self.patcher_log = patch.object(cnl, "LOG_FILE", self.tmp_cache_dir / "test.log")
         self.patcher_dir.start()
         self.patcher_file.start()
+        self.patcher_log_dir.start()
         self.patcher_log.start()
 
     def tearDown(self):
         self.patcher_dir.stop()
         self.patcher_file.stop()
+        self.patcher_log_dir.stop()
         self.patcher_log.stop()
         import shutil
 

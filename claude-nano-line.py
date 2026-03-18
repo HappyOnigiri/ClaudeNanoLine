@@ -518,7 +518,10 @@ def render_custom(fmt, ctx_remaining, usage, model, cwd_real, git_branch):
             digits_opt = opts.get("digits", "")
             if unit_opt or digits_opt:
                 unit = unit_opt if unit_opt else "auto"
-                digits = int(digits_opt) if digits_opt else 1
+                try:
+                    digits = int(digits_opt) if digits_opt else 1
+                except (TypeError, ValueError):
+                    digits = 1
                 val = fmt_reset_time_v2(iso, unit, digits)
             else:
                 fmt_t = opts.get("format", "auto")

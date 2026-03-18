@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.3.0](https://github.com/HappyOnigiri/ClaudeNanoLine/compare/ClaudeCodeStatusline-v0.2.0...ClaudeCodeStatusline-v0.3.0) (2026-03-18)
+
+
+### Features
+
+* **claude-nano-line:** auto フォーマットで1日以上2日未満の場合に XdXh 形式で表示 ([8d46fce](https://github.com/HappyOnigiri/ClaudeNanoLine/commit/8d46fce4dad4e21be5ddcb64cc6f50a34fd64b9d))
+* **root:** bash+Python ハイブリッドを純 Python スクリプトに書き換え（jq/curl 依存排除・フレキシブルフォーマット対応） ([951a7b0](https://github.com/HappyOnigiri/ClaudeNanoLine/commit/951a7b036035ff6e3294269312d6a427c9566bd6))
+
+
+### Bug Fixes
+
+* **claude-nano-line.py:** get_threshold_color で不正な閾値に対し ValueError をキャッチしデフォルト値にフォールバック ([b403385](https://github.com/HappyOnigiri/ClaudeNanoLine/commit/b403385a44c4a7c8dc5840f887e208ffabfa1c35))
+* **claude-nano-line.py:** HTTP 429 を rate-limit として正しく処理 ([534cbb6](https://github.com/HappyOnigiri/ClaudeNanoLine/commit/534cbb650f611a32b4662c030c4ae60ab8a853d7))
+* **claude-nano-line.py:** workspace/model/context_window が null の場合の None.get() クラッシュを修正 ([8238a34](https://github.com/HappyOnigiri/ClaudeNanoLine/commit/8238a34acd2e24998e9de06bdc78bd2c88d46570))
+* **claude-nano-line:** digits オプションに無効な値が渡された場合のクラッシュを修正 ([be2c40d](https://github.com/HappyOnigiri/ClaudeNanoLine/commit/be2c40d15f453c5eb95d629101e7bc3cb9df1492))
+* **claude-nano-line:** fmt_reset_time_v2 で digits に負値が渡された場合の無効フォーマット文字列を修正 ([84751fe](https://github.com/HappyOnigiri/ClaudeNanoLine/commit/84751fe37824fbe38f59cc21ef7087e0dd9c2175))
+* **claude-nano-line:** unit=dh で h が丸めにより 24 以上になる境界値バグを修正 ([016fc0e](https://github.com/HappyOnigiri/ClaudeNanoLine/commit/016fc0e64f7e71927701d9d78e98398f302d41a9))
+* **setup.sh:** STATUS_LINE_ENTRY を環境変数経由で Python に渡し JSON 構文エラーを回避 ([d5ae408](https://github.com/HappyOnigiri/ClaudeNanoLine/commit/d5ae4087d5d456572e1b91df14f83ed7927c6d82))
+* **setup.sh:** statusLine を深いマージで更新し既存サブキーを保持 ([e774a38](https://github.com/HappyOnigiri/ClaudeNanoLine/commit/e774a38c0b9bce21b47cba46857a993c5bbb2990))
+
 ## [0.2.0](https://github.com/HappyOnigiri/ClaudeCodeStatusline/compare/ClaudeCodeStatusline-v0.1.0...ClaudeCodeStatusline-v0.2.0) (2026-03-13)
 
 

@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 HappyOnigiri
+# MIT License
+# https://github.com/HappyOnigiri/ClaudeNanoLine
+#
+# Usage: set as Claude Code statusLine command in ~/.claude/settings.json:
+#   "statusLine": {"type": "command", "command": "python3 ~/.claude/claude-nano-line.py"}
+# Customize output via CLAUDE_NANO_LINE_FORMAT environment variable.
 """Claude Code status line - API usage, model, cwd, git branch."""
 
 import json

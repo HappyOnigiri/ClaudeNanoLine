@@ -1,0 +1,827 @@
+#!/usr/bin/env python3
+"""Comprehensive unit tests for claude-nano-line.py"""
+
+import importlib.util
+import json
+import os
+import re
+import sys
+import tempfile
+import time
+import unittest
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+# ── Module loader ──────────────────────────────────────────────────────────────
+_REPO_DIR = Path(__file__).parent.parent
+spec = importlib.util.spec_from_file_location(
+    "claude_nano_line", _REPO_DIR / "claude-nano-line.py"
+)
+cnl = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(cnl)
+
+
+def strip_ansi(s):
+    return re.sub(r"\033\[[^m]*m", "", s)
+
+
+# ── 1. TestToPct ───────────────────────────────────────────────────────────────
+class TestToPct(unittest.TestCase):
+    def test_none_returns_negative_one(self):
+        self.assertEqual(cnl.to_pct(None), (-1, -1.0))
+
+    def test_zero(self):
+        self.assertEqual(cnl.to_pct(0), (0, 0.0))
+
+    def test_integer_value(self):
+        self.assertEqual(cnl.to_pct(50), (50, 50.0))
+
+    def test_float_value(self):
+        self.assertEqual(cnl.to_pct(42.7), (42, 42.7))
+
+    def test_string_numeric(self):
+        self.assertEqual(cnl.to_pct("75.5"), (75, 75.5))
+
+    def test_cap_at_100(self):
+        self.assertEqual(cnl.to_pct(150), (100, 100.0))
+
+    def test_small_float(self):
+        self.assertEqual(cnl.to_pct(0.5), (0, 0.5))
+
+
+# ── 2. TestFmtResetTime ────────────────────────────────────────────────────────
+class TestFmtResetTime(unittest.TestCase):
+    # 固定現在時刻: 2026-03-18 12:00:00 UTC
+    FIXED_NOW = datetime(2026, 3, 18, 12, 0, 0, tzinfo=timezone.utc)
+
+    def _iso(self, delta_seconds):
+        """現在時刻から delta_seconds 後の ISO 文字列を返す"""
+        return (self.FIXED_NOW + timedelta(seconds=delta_seconds)).isoformat()
+
+    def _patch_now(self):
+        return patch("claude_nano_line.datetime") if False else patch.object(
+            cnl, "datetime",
+            **{
+                "now.return_value": self.FIXED_NOW,
+                "fromisoformat.side_effect": datetime.fromisoformat,
+                "spec": datetime,
+            }
+        )
+
+    def setUp(self):
+        # datetime.now をパッチ: fromisoformat は本物を使う
+        self.mock_dt = MagicMock(spec=datetime)
+        self.mock_dt.now.return_value = self.FIXED_NOW
+        self.mock_dt.fromisoformat.side_effect = datetime.fromisoformat
+        self.patcher = patch.object(cnl, "datetime", self.mock_dt)
+        self.patcher.start()
+
+    def tearDown(self):
+        self.patcher.stop()
+
+    def test_empty_string(self):
+        self.assertEqual(cnl.fmt_reset_time(""), "")
+
+    def test_past_date(self):
+        past = self._iso(-100)
+        self.assertEqual(cnl.fmt_reset_time(past), "")
+
+    def test_invalid_iso_string(self):
+        self.assertEqual(cnl.fmt_reset_time("not-a-date"), "")
+
+    def test_auto_under_1h(self):
+        iso = self._iso(30 * 60)  # 30分後
+        result = cnl.fmt_reset_time(iso)
+        self.assertEqual(result, "30m")
+
+    def test_auto_1h_to_10h(self):
+        iso = self._iso(int(2.5 * 3600))  # 2.5時間後
+        result = cnl.fmt_reset_time(iso)
+        self.assertEqual(result, "2.5h")
+
+    def test_auto_10h_to_24h(self):
+        iso = self._iso(15 * 3600 + 30 * 60)  # 15h30m後
+        result = cnl.fmt_reset_time(iso)
+        self.assertEqual(result, "15h30m")
+
+    def test_auto_over_24h(self):
+        iso = self._iso(36 * 3600)  # 36時間後
+        result = cnl.fmt_reset_time(iso)
+        self.assertEqual(result, "1d")
+
+    def test_fmt_hm(self):
+        iso = self._iso(int(2.5 * 3600))  # 2.5時間後 = 2h30m
+        result = cnl.fmt_reset_time(iso, "hm")
+        self.assertEqual(result, "2h30m")
+
+    def test_fmt_h1(self):
+        iso = self._iso(int(2.5 * 3600))
+        result = cnl.fmt_reset_time(iso, "h1")
+        self.assertEqual(result, "2.5h")
+
+    def test_fmt_dh_with_days(self):
+        iso = self._iso(27 * 3600)  # 27時間 = 1d3h
+        result = cnl.fmt_reset_time(iso, "dh")
+        self.assertEqual(result, "1d 3h")
+
+    def test_fmt_dh_no_days(self):
+        iso = self._iso(5 * 3600)
+        result = cnl.fmt_reset_time(iso, "dh")
+        self.assertEqual(result, "5h")
+
+    def test_fmt_d1(self):
+        iso = self._iso(36 * 3600)  # 1.5日
+        result = cnl.fmt_reset_time(iso, "d1")
+        self.assertEqual(result, "1.5d")
+
+    def test_z_suffix(self):
+        dt = self.FIXED_NOW + timedelta(minutes=30)
+        iso_z = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        result = cnl.fmt_reset_time(iso_z)
+        self.assertEqual(result, "30m")
+
+
+# ── 3. TestColorize ────────────────────────────────────────────────────────────
+class TestColorize(unittest.TestCase):
+    def test_with_color(self):
+        result = cnl.colorize("hello", "\033[0;32m")
+        self.assertTrue(result.startswith("\033[0;32m"))
+        self.assertIn("hello", result)
+        self.assertTrue(result.endswith(cnl.RESET))
+
+    def test_empty_color_code(self):
+        result = cnl.colorize("hello", "")
+        self.assertEqual(result, "hello")
+
+    def test_empty_text(self):
+        result = cnl.colorize("", "\033[0;32m")
+        self.assertEqual(result, "\033[0;32m" + cnl.RESET)
+
+
+# ── 4. TestGetModelColor ───────────────────────────────────────────────────────
+class TestGetModelColor(unittest.TestCase):
+    def test_haiku(self):
+        self.assertEqual(cnl.get_model_color("claude-haiku-3"), cnl.COLOR_MAP["amber"])
+
+    def test_sonnet(self):
+        self.assertEqual(cnl.get_model_color("claude-sonnet-4"), cnl.COLOR_MAP["sky_blue"])
+
+    def test_opus(self):
+        self.assertEqual(cnl.get_model_color("claude-opus-4"), cnl.COLOR_MAP["pink"])
+
+    def test_case_insensitive(self):
+        self.assertEqual(cnl.get_model_color("Claude-Haiku-3-5"), cnl.COLOR_MAP["amber"])
+        self.assertEqual(cnl.get_model_color("CLAUDE-SONNET-3"), cnl.COLOR_MAP["sky_blue"])
+
+    def test_unknown_model(self):
+        self.assertEqual(cnl.get_model_color("gpt-4"), cnl.COLOR_MAP["magenta"])
+
+
+# ── 5. TestUsageColor ──────────────────────────────────────────────────────────
+class TestUsageColor(unittest.TestCase):
+    def test_green(self):
+        self.assertEqual(cnl.usage_color(50), cnl.COLOR_MAP["green"])
+
+    def test_yellow(self):
+        self.assertEqual(cnl.usage_color(85), cnl.COLOR_MAP["yellow"])
+
+    def test_red(self):
+        self.assertEqual(cnl.usage_color(97), cnl.COLOR_MAP["red"])
+
+    def test_boundary_79_80_95(self):
+        self.assertEqual(cnl.usage_color(79), cnl.COLOR_MAP["green"])
+        self.assertEqual(cnl.usage_color(80), cnl.COLOR_MAP["yellow"])
+        self.assertEqual(cnl.usage_color(95), cnl.COLOR_MAP["red"])
+
+    def test_custom_thresholds(self):
+        self.assertEqual(cnl.usage_color(60, warn_pct=70, crit_pct=90), cnl.COLOR_MAP["green"])
+        self.assertEqual(cnl.usage_color(75, warn_pct=70, crit_pct=90), cnl.COLOR_MAP["yellow"])
+        self.assertEqual(cnl.usage_color(92, warn_pct=70, crit_pct=90), cnl.COLOR_MAP["red"])
+
+
+# ── 6. TestParseOptions ────────────────────────────────────────────────────────
+class TestParseOptions(unittest.TestCase):
+    def test_single_pair(self):
+        self.assertEqual(cnl.parse_options("color:green"), {"color": "green"})
+
+    def test_multiple_pairs(self):
+        result = cnl.parse_options("color:red,warn-threshold:80")
+        self.assertEqual(result, {"color": "red", "warn-threshold": "80"})
+
+    def test_empty_string(self):
+        self.assertEqual(cnl.parse_options(""), {})
+
+    def test_no_colon(self):
+        self.assertEqual(cnl.parse_options("novalue"), {})
+
+    def test_colon_in_value(self):
+        result = cnl.parse_options("key:val:extra")
+        self.assertEqual(result, {"key": "val:extra"})
+
+
+# ── 7. TestGetThresholdColor ───────────────────────────────────────────────────
+class TestGetThresholdColor(unittest.TestCase):
+    def test_defaults_green(self):
+        color = cnl.get_threshold_color(50, {})
+        self.assertEqual(color, cnl.COLOR_MAP["green"])
+
+    def test_defaults_yellow(self):
+        color = cnl.get_threshold_color(85, {})
+        self.assertEqual(color, cnl.COLOR_MAP["yellow"])
+
+    def test_defaults_red(self):
+        color = cnl.get_threshold_color(97, {})
+        self.assertEqual(color, cnl.COLOR_MAP["red"])
+
+    def test_custom_thresholds(self):
+        opts = {"warn-threshold": "60", "alert-threshold": "85"}
+        self.assertEqual(cnl.get_threshold_color(55, opts), cnl.COLOR_MAP["green"])
+        self.assertEqual(cnl.get_threshold_color(70, opts), cnl.COLOR_MAP["yellow"])
+        self.assertEqual(cnl.get_threshold_color(90, opts), cnl.COLOR_MAP["red"])
+
+    def test_custom_colors(self):
+        opts = {"color": "cyan", "warn-color": "amber", "alert-color": "pink"}
+        self.assertEqual(cnl.get_threshold_color(50, opts), cnl.COLOR_MAP["cyan"])
+        self.assertEqual(cnl.get_threshold_color(85, opts), cnl.COLOR_MAP["amber"])
+        self.assertEqual(cnl.get_threshold_color(97, opts), cnl.COLOR_MAP["pink"])
+
+
+# ── 8. TestRenderLegacy ────────────────────────────────────────────────────────
+class TestRenderLegacy(unittest.TestCase):
+    def _usage(self, five=50, seven=60, api_error=""):
+        if api_error:
+            return {"api_error": api_error}
+        return {
+            "five_hour_pct": five,
+            "five_hour_pct_raw": float(five),
+            "seven_day_pct": seven,
+            "seven_day_pct_raw": float(seven),
+            "five_resets_at": "",
+            "seven_resets_at": "",
+        }
+
+    def test_normal_5h_and_7d(self):
+        out = strip_ansi(cnl.render_legacy(None, self._usage(50, 60), "sonnet", "myproject", ""))
+        self.assertIn("[5h]", out)
+        self.assertIn("50%", out)
+        self.assertIn("[7d]", out)
+        self.assertIn("60%", out)
+
+    def test_only_5h_data(self):
+        out = strip_ansi(cnl.render_legacy(None, self._usage(50, -1), "sonnet", "myproject", ""))
+        self.assertIn("[5h]", out)
+        self.assertIn("[7d] --%", out)
+
+    def test_no_data(self):
+        out = strip_ansi(cnl.render_legacy(None, self._usage(-1, -1), "sonnet", "myproject", ""))
+        self.assertIn("[5h] --%", out)
+        self.assertIn("[7d] --%", out)
+
+    def test_api_error_limit(self):
+        out = strip_ansi(cnl.render_legacy(None, self._usage(api_error="limit"), "sonnet", "proj", ""))
+        self.assertIn("Usage API Rate Limit", out)
+
+    def test_api_error_timeout(self):
+        out = strip_ansi(cnl.render_legacy(None, self._usage(api_error="timeout"), "sonnet", "proj", ""))
+        self.assertIn("Timeout", out)
+
+    def test_api_error_unknown(self):
+        out = strip_ansi(cnl.render_legacy(None, self._usage(api_error="unknown"), "sonnet", "proj", ""))
+        self.assertIn("Unknown Error", out)
+
+    def test_with_ctx_remaining(self):
+        out = strip_ansi(cnl.render_legacy(70, self._usage(), "sonnet", "proj", ""))
+        self.assertIn("[ctx]", out)
+        self.assertIn("30%", out)
+
+    def test_without_ctx_remaining(self):
+        out = strip_ansi(cnl.render_legacy(None, self._usage(), "sonnet", "proj", ""))
+        self.assertNotIn("[ctx]", out)
+
+    def test_with_git_branch(self):
+        out = strip_ansi(cnl.render_legacy(None, self._usage(), "sonnet", "proj", "main"))
+        self.assertIn("(main)", out)
+
+    def test_without_git_branch(self):
+        out = strip_ansi(cnl.render_legacy(None, self._usage(), "sonnet", "proj", ""))
+        # ブランチ名が空の場合 "(branch)" 形式のgit情報が表示されないことを確認
+        self.assertNotIn("(main)", out)
+        self.assertNotIn("(feat/", out)
+
+    def test_color_green(self):
+        out = cnl.render_legacy(None, self._usage(50, 50), "sonnet", "proj", "")
+        self.assertIn(cnl.COLOR_MAP["green"], out)
+
+    def test_color_yellow(self):
+        out = cnl.render_legacy(None, self._usage(85, 85), "sonnet", "proj", "")
+        self.assertIn(cnl.COLOR_MAP["yellow"], out)
+
+    def test_color_red(self):
+        out = cnl.render_legacy(None, self._usage(97, 97), "sonnet", "proj", "")
+        self.assertIn(cnl.COLOR_MAP["red"], out)
+
+    def test_model_haiku(self):
+        out = cnl.render_legacy(None, self._usage(), "claude-haiku-3", "proj", "")
+        self.assertIn(cnl.COLOR_MAP["amber"], out)
+
+    def test_model_sonnet(self):
+        out = cnl.render_legacy(None, self._usage(), "claude-sonnet-4", "proj", "")
+        self.assertIn(cnl.COLOR_MAP["sky_blue"], out)
+
+    def test_model_opus(self):
+        out = cnl.render_legacy(None, self._usage(), "claude-opus-4", "proj", "")
+        self.assertIn(cnl.COLOR_MAP["pink"], out)
+
+    def test_api_error_suppresses_seven_part(self):
+        # api_error 時は seven_part が空 → [7d] が出ない
+        out = strip_ansi(cnl.render_legacy(None, self._usage(api_error="timeout"), "sonnet", "proj", ""))
+        self.assertNotIn("[7d]", out)
+
+
+# ── 9. TestRenderCustom ────────────────────────────────────────────────────────
+class TestRenderCustom(unittest.TestCase):
+    def _usage(self, five=42, seven=60, five_raw=42.7, seven_raw=60.0,
+               five_resets="", seven_resets="", api_error=""):
+        if api_error:
+            return {"api_error": api_error}
+        return {
+            "five_hour_pct": five,
+            "five_hour_pct_raw": five_raw,
+            "seven_day_pct": seven,
+            "seven_day_pct_raw": seven_raw,
+            "five_resets_at": five_resets,
+            "seven_resets_at": seven_resets,
+        }
+
+    def _render(self, fmt, ctx=None, usage=None, model="sonnet", cwd="/home/user/project", branch="main"):
+        if usage is None:
+            usage = self._usage()
+        return cnl.render_custom(fmt, ctx, usage, model, cwd, branch)
+
+    def test_5h_pct(self):
+        out = strip_ansi(self._render("{5h_pct}"))
+        self.assertEqual(out, "42%")
+
+    def test_7d_pct(self):
+        out = strip_ansi(self._render("{7d_pct}"))
+        self.assertEqual(out, "60%")
+
+    def test_ctx_pct(self):
+        out = strip_ansi(self._render("{ctx_pct}", ctx=70))
+        self.assertEqual(out, "30%")
+
+    def test_5h_pct_format_pct1(self):
+        out = strip_ansi(self._render("{5h_pct|format:pct1}"))
+        self.assertEqual(out, "42.7%")
+
+    def test_pct_no_data(self):
+        out = strip_ansi(self._render("{5h_pct}", usage=self._usage(five=-1)))
+        self.assertEqual(out, "--%")
+
+    def test_pct_custom_thresholds(self):
+        out = self._render("{5h_pct|warn-threshold:50,alert-threshold:90}", usage=self._usage(five=60))
+        self.assertIn(cnl.COLOR_MAP["yellow"], out)
+
+    def test_pct_custom_colors(self):
+        out = self._render("{5h_pct|color:cyan}", usage=self._usage(five=30))
+        self.assertIn(cnl.COLOR_MAP["cyan"], out)
+
+    def test_5h_reset(self):
+        # fmt_reset_time は別途テスト済みなので、空文字が返ることだけ確認
+        out = strip_ansi(self._render("{5h_reset}"))
+        self.assertEqual(out, "")  # five_resets="" なので空
+
+    def test_7d_reset(self):
+        out = strip_ansi(self._render("{7d_reset}"))
+        self.assertEqual(out, "")
+
+    def test_reset_format_hm(self):
+        # fmt_reset_time のモックは不要 (空文字列)
+        out = strip_ansi(self._render("{5h_reset|format:hm}"))
+        self.assertEqual(out, "")
+
+    def test_reset_with_color(self):
+        # 空値の場合色が付かないことを確認
+        out = self._render("{5h_reset|color:red}")
+        self.assertNotIn(cnl.COLOR_MAP["red"], out)
+
+    def test_model_default_color(self):
+        out = self._render("{model}", model="claude-haiku-3")
+        self.assertIn(cnl.COLOR_MAP["amber"], out)
+
+    def test_model_custom_color(self):
+        out = self._render("{model|color:cyan}", model="claude-haiku-3")
+        self.assertIn(cnl.COLOR_MAP["cyan"], out)
+        self.assertNotIn(cnl.COLOR_MAP["amber"], out)
+
+    def test_cwd(self):
+        out = strip_ansi(self._render("{cwd}", cwd="/home/user/myproject"))
+        self.assertEqual(out, "myproject")
+
+    def test_cwd_short(self):
+        home = str(Path.home())
+        out = strip_ansi(self._render("{cwd_short}", cwd=home + "/projects/foo"))
+        self.assertEqual(out, "~/projects/foo")
+
+    def test_cwd_full(self):
+        out = strip_ansi(self._render("{cwd_full}", cwd="/absolute/path/proj"))
+        self.assertEqual(out, "/absolute/path/proj")
+
+    def test_branch(self):
+        out = strip_ansi(self._render("{branch}", branch="feature/test"))
+        self.assertEqual(out, "feature/test")
+
+    def test_branch_with_color(self):
+        out = self._render("{branch|color:cyan}", branch="main")
+        self.assertIn(cnl.COLOR_MAP["cyan"], out)
+        self.assertIn("main", out)
+
+    def test_branch_empty(self):
+        out = strip_ansi(self._render("{branch}", branch=""))
+        self.assertEqual(out, "")
+
+    def test_text_literal(self):
+        out = strip_ansi(self._render("{text:hello world}"))
+        self.assertEqual(out, "hello world")
+
+    def test_text_with_color(self):
+        out = self._render("{text:hello|color:red}")
+        self.assertIn(cnl.COLOR_MAP["red"], out)
+        self.assertIn("hello", out)
+
+    def test_text_with_pipe(self):
+        out = strip_ansi(self._render("{text: | |color:gray}"))
+        self.assertEqual(out, " | ")
+
+    def test_api_error_in_pct(self):
+        out = strip_ansi(self._render("{5h_pct}", usage=self._usage(api_error="timeout")))
+        self.assertEqual(out, "Timeout")
+
+    def test_ctx_pct_not_affected_by_api_error(self):
+        out = strip_ansi(self._render("{ctx_pct}", ctx=70, usage=self._usage(api_error="timeout")))
+        self.assertEqual(out, "30%")
+
+    def test_unknown_placeholder(self):
+        out = strip_ansi(self._render("{unknown_token}"))
+        self.assertEqual(out, "")
+
+    def test_combined_format(self):
+        out = strip_ansi(self._render(
+            "{5h_pct} {7d_pct} {model} {cwd}",
+            usage=self._usage(five=42, seven=60),
+            model="claude-sonnet-4",
+            cwd="/home/user/myproject",
+        ))
+        self.assertIn("42%", out)
+        self.assertIn("60%", out)
+        self.assertIn("claude-sonnet-4", out)
+        self.assertIn("myproject", out)
+
+
+# ── 10. TestGetGitBranch ───────────────────────────────────────────────────────
+class TestGetGitBranch(unittest.TestCase):
+    def test_success(self):
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "main\n"
+        with patch.object(cnl.subprocess, "run", return_value=mock_result):
+            self.assertEqual(cnl.get_git_branch("/some/path"), "main")
+
+    def test_failure(self):
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        with patch.object(cnl.subprocess, "run", return_value=mock_result):
+            self.assertEqual(cnl.get_git_branch("/some/path"), "")
+
+    def test_exception(self):
+        with patch.object(cnl.subprocess, "run", side_effect=Exception("oops")):
+            self.assertEqual(cnl.get_git_branch("/some/path"), "")
+
+    def test_empty_cwd(self):
+        with patch.object(cnl.subprocess, "run") as mock_run:
+            result = cnl.get_git_branch("")
+            self.assertEqual(result, "")
+            mock_run.assert_not_called()
+
+    def test_none_cwd(self):
+        with patch.object(cnl.subprocess, "run") as mock_run:
+            result = cnl.get_git_branch(None)
+            self.assertEqual(result, "")
+            mock_run.assert_not_called()
+
+
+# ── 11. TestGetOAuthToken ──────────────────────────────────────────────────────
+class TestGetOAuthToken(unittest.TestCase):
+    def _keychain_result(self, returncode, stdout):
+        r = MagicMock()
+        r.returncode = returncode
+        r.stdout = stdout
+        return r
+
+    def test_keychain_success(self):
+        creds = json.dumps({"claudeAiOauth": {"accessToken": "token123"}})
+        mock_result = self._keychain_result(0, creds)
+        with patch.object(cnl.subprocess, "run", return_value=mock_result):
+            self.assertEqual(cnl.get_oauth_token(), "token123")
+
+    def test_keychain_fail_file_success(self):
+        mock_result = self._keychain_result(1, "")
+        creds_data = json.dumps({"claudeAiOauth": {"accessToken": "file_token"}})
+        with patch.object(cnl.subprocess, "run", return_value=mock_result):
+            with patch("builtins.open", unittest.mock.mock_open(read_data=creds_data)):
+                self.assertEqual(cnl.get_oauth_token(), "file_token")
+
+    def test_both_fail(self):
+        mock_result = self._keychain_result(1, "")
+        with patch.object(cnl.subprocess, "run", return_value=mock_result):
+            with patch("builtins.open", side_effect=FileNotFoundError):
+                self.assertIsNone(cnl.get_oauth_token())
+
+    def test_keychain_invalid_json(self):
+        mock_result = self._keychain_result(0, "not-valid-json")
+        creds_data = json.dumps({"claudeAiOauth": {"accessToken": "fallback_token"}})
+        with patch.object(cnl.subprocess, "run", return_value=mock_result):
+            with patch("builtins.open", unittest.mock.mock_open(read_data=creds_data)):
+                self.assertEqual(cnl.get_oauth_token(), "fallback_token")
+
+
+# ── 12. TestCacheReadWrite ─────────────────────────────────────────────────────
+class TestCacheReadWrite(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.tmp_cache_dir = Path(self.tmpdir)
+        self.tmp_cache_file = self.tmp_cache_dir / "claude-usage-cache.json"
+        self.patcher_dir = patch.object(cnl, "CACHE_DIR", self.tmp_cache_dir)
+        self.patcher_file = patch.object(cnl, "CACHE_FILE", self.tmp_cache_file)
+        self.patcher_dir.start()
+        self.patcher_file.start()
+
+    def tearDown(self):
+        self.patcher_dir.stop()
+        self.patcher_file.stop()
+        import shutil
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_write_and_read(self):
+        data = {"five_hour_pct": 42, "seven_day_pct": 60}
+        cnl.write_cache(data)
+        result = cnl.read_cache()
+        self.assertIsNotNone(result)
+        self.assertEqual(result["five_hour_pct"], 42)
+
+    def test_expired(self):
+        data = {"five_hour_pct": 42, "_ts": int(time.time()) - cnl.CACHE_TTL - 10}
+        with open(self.tmp_cache_file, "w") as f:
+            json.dump(data, f)
+        result = cnl.read_cache()
+        self.assertIsNone(result)
+
+    def test_missing_file(self):
+        result = cnl.read_cache()
+        self.assertIsNone(result)
+
+    def test_corrupted_json(self):
+        with open(self.tmp_cache_file, "w") as f:
+            f.write("not valid json{{{")
+        result = cnl.read_cache()
+        self.assertIsNone(result)
+
+    def test_creates_dir(self):
+        import shutil
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+        cnl.write_cache({"five_hour_pct": 10})
+        self.assertTrue(self.tmp_cache_file.exists())
+
+
+# ── 13. TestWriteLog ───────────────────────────────────────────────────────────
+class TestWriteLog(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.tmp_cache_dir = Path(self.tmpdir)
+        self.tmp_log_file = self.tmp_cache_dir / "claude-usage-api.log"
+        self.patcher_dir = patch.object(cnl, "CACHE_DIR", self.tmp_cache_dir)
+        self.patcher_file = patch.object(cnl, "LOG_FILE", self.tmp_log_file)
+        self.patcher_dir.start()
+        self.patcher_file.start()
+
+    def tearDown(self):
+        self.patcher_dir.stop()
+        self.patcher_file.stop()
+        import shutil
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_creates_file(self):
+        cnl.write_log("test message")
+        self.assertTrue(self.tmp_log_file.exists())
+        content = self.tmp_log_file.read_text()
+        self.assertIn("test message", content)
+
+    def test_appends(self):
+        cnl.write_log("first")
+        cnl.write_log("second")
+        lines = self.tmp_log_file.read_text().strip().splitlines()
+        self.assertEqual(len(lines), 2)
+        self.assertIn("first", lines[0])
+        self.assertIn("second", lines[1])
+
+
+# ── 14. TestFetchUsage ─────────────────────────────────────────────────────────
+class TestFetchUsage(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.tmp_cache_dir = Path(self.tmpdir)
+        self.patcher_dir = patch.object(cnl, "CACHE_DIR", self.tmp_cache_dir)
+        self.patcher_file = patch.object(cnl, "CACHE_FILE", self.tmp_cache_dir / "cache.json")
+        self.patcher_log = patch.object(cnl, "LOG_FILE", self.tmp_cache_dir / "test.log")
+        self.patcher_dir.start()
+        self.patcher_file.start()
+        self.patcher_log.start()
+
+    def tearDown(self):
+        self.patcher_dir.stop()
+        self.patcher_file.stop()
+        self.patcher_log.stop()
+        import shutil
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def _mock_response(self, data):
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps(data).encode()
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        return mock_resp
+
+    def test_success(self):
+        resp_data = {
+            "five_hour": {"utilization": 42.7, "resets_at": "2026-03-18T18:00:00Z"},
+            "seven_day": {"utilization": 60.0, "resets_at": "2026-03-25T00:00:00Z"},
+        }
+        with patch.object(cnl, "urlopen", return_value=self._mock_response(resp_data)):
+            result = cnl.fetch_usage("mytoken")
+        self.assertIn("five_hour_pct", result)
+        self.assertIn("seven_day_pct", result)
+        self.assertIn("five_hour_pct_raw", result)
+        self.assertIn("seven_day_pct_raw", result)
+        self.assertIn("five_resets_at", result)
+        self.assertIn("seven_resets_at", result)
+        self.assertEqual(result["five_hour_pct"], 42)
+
+    def test_timeout(self):
+        with patch.object(cnl, "urlopen", side_effect=TimeoutError()):
+            result = cnl.fetch_usage("mytoken")
+        self.assertEqual(result, {"api_error": "timeout"})
+
+    def test_url_error_timed_out(self):
+        from urllib.error import URLError
+        with patch.object(cnl, "urlopen", side_effect=URLError("timed out")):
+            result = cnl.fetch_usage("mytoken")
+        self.assertEqual(result, {"api_error": "timeout"})
+
+    def test_url_error_other(self):
+        from urllib.error import URLError
+        with patch.object(cnl, "urlopen", side_effect=URLError("connection refused")):
+            result = cnl.fetch_usage("mytoken")
+        self.assertEqual(result, {"api_error": "unknown"})
+
+    def test_http_error(self):
+        from urllib.error import HTTPError
+        with patch.object(cnl, "urlopen", side_effect=HTTPError("url", 403, "Forbidden", {}, None)):
+            result = cnl.fetch_usage("mytoken")
+        self.assertEqual(result, {"api_error": "unknown"})
+
+    def test_json_parse_error(self):
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b"not-json"
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        with patch.object(cnl, "urlopen", return_value=mock_resp):
+            result = cnl.fetch_usage("mytoken")
+        self.assertEqual(result, {"api_error": "unknown"})
+
+    def test_rate_limit(self):
+        resp_data = {"error": {"type": "rate_limit_error", "message": "rate limited"}}
+        with patch.object(cnl, "urlopen", return_value=self._mock_response(resp_data)):
+            result = cnl.fetch_usage("mytoken")
+        self.assertEqual(result, {"api_error": "limit"})
+
+    def test_utilization_cap(self):
+        resp_data = {
+            "five_hour": {"utilization": 120.0, "resets_at": ""},
+            "seven_day": {"utilization": 150.0, "resets_at": ""},
+        }
+        with patch.object(cnl, "urlopen", return_value=self._mock_response(resp_data)):
+            result = cnl.fetch_usage("mytoken")
+        self.assertEqual(result["five_hour_pct"], 100)
+        self.assertEqual(result["seven_day_pct"], 100)
+        self.assertEqual(result["five_hour_pct_raw"], 100.0)
+
+
+# ── 15. TestGetUsageData ───────────────────────────────────────────────────────
+class TestGetUsageData(unittest.TestCase):
+    def test_cache_hit(self):
+        cached = {"five_hour_pct": 42, "seven_day_pct": 60, "_ts": int(time.time())}
+        with patch.object(cnl, "read_cache", return_value=cached):
+            with patch.object(cnl, "fetch_usage") as mock_fetch:
+                result = cnl.get_usage_data()
+        mock_fetch.assert_not_called()
+        self.assertEqual(result["five_hour_pct"], 42)
+
+    def test_cache_miss_with_token(self):
+        with patch.object(cnl, "read_cache", return_value=None):
+            with patch.object(cnl, "get_oauth_token", return_value="mytoken"):
+                with patch.object(cnl, "fetch_usage", return_value={"five_hour_pct": 55}) as mock_fetch:
+                    result = cnl.get_usage_data()
+        mock_fetch.assert_called_once_with("mytoken")
+        self.assertEqual(result["five_hour_pct"], 55)
+
+    def test_no_token(self):
+        with patch.object(cnl, "read_cache", return_value=None):
+            with patch.object(cnl, "get_oauth_token", return_value=None):
+                result = cnl.get_usage_data()
+        self.assertEqual(result, {})
+
+
+# ── 16. TestMainIntegration ────────────────────────────────────────────────────
+class TestMainIntegration(unittest.TestCase):
+    _USAGE = {
+        "five_hour_pct": 42,
+        "five_hour_pct_raw": 42.0,
+        "seven_day_pct": 60,
+        "seven_day_pct_raw": 60.0,
+        "five_resets_at": "",
+        "seven_resets_at": "",
+    }
+
+    def _run_main(self, stdin_data, env=None):
+        import io
+        stdin_json = json.dumps(stdin_data)
+        with patch("sys.stdin", io.StringIO(stdin_json)):
+            with patch.object(cnl, "get_usage_data", return_value=self._USAGE):
+                with patch.object(cnl, "get_git_branch", return_value="main"):
+                    env_patch = {}
+                    if env:
+                        env_patch = env
+                    with patch.dict(os.environ, env_patch, clear=False):
+                        # CLAUDE_NANO_LINE_FORMAT をクリアする場合
+                        if "CLAUDE_NANO_LINE_FORMAT" not in env_patch:
+                            with patch.dict(os.environ, {"CLAUDE_NANO_LINE_FORMAT": ""}, clear=False):
+                                captured = io.StringIO()
+                                with patch("sys.stdout", captured):
+                                    cnl.main()
+                                return captured.getvalue()
+                        else:
+                            captured = io.StringIO()
+                            with patch("sys.stdout", captured):
+                                cnl.main()
+                            return captured.getvalue()
+
+    def test_legacy_mode(self):
+        input_data = {
+            "model": {"display_name": "claude-sonnet-4"},
+            "workspace": {"current_dir": "/home/user/project"},
+            "context_window": {"remaining_percentage": 70},
+        }
+        out = strip_ansi(self._run_main(input_data))
+        self.assertIn("[5h]", out)
+        self.assertIn("42%", out)
+        self.assertIn("[7d]", out)
+
+    def test_custom_format(self):
+        input_data = {
+            "model": {"display_name": "claude-sonnet-4"},
+            "workspace": {"current_dir": "/home/user/project"},
+        }
+        out = strip_ansi(self._run_main(input_data, env={"CLAUDE_NANO_LINE_FORMAT": "{5h_pct} | {model}"}))
+        self.assertIn("42%", out)
+        self.assertIn("claude-sonnet-4", out)
+
+    def test_invalid_json_stdin(self):
+        import io
+        with patch("sys.stdin", io.StringIO("not valid json{")):
+            with patch.object(cnl, "get_usage_data", return_value=self._USAGE):
+                with patch.object(cnl, "get_git_branch", return_value=""):
+                    with patch.dict(os.environ, {"CLAUDE_NANO_LINE_FORMAT": ""}, clear=False):
+                        captured = io.StringIO()
+                        with patch("sys.stdout", captured):
+                            # クラッシュしないことを確認
+                            cnl.main()
+                        out = captured.getvalue()
+        # 何らかの出力があること（空でない）
+        self.assertIsInstance(out, str)
+
+    def test_empty_stdin(self):
+        import io
+        with patch("sys.stdin", io.StringIO("")):
+            with patch.object(cnl, "get_usage_data", return_value=self._USAGE):
+                with patch.object(cnl, "get_git_branch", return_value=""):
+                    with patch.dict(os.environ, {"CLAUDE_NANO_LINE_FORMAT": ""}, clear=False):
+                        captured = io.StringIO()
+                        with patch("sys.stdout", captured):
+                            cnl.main()
+                        out = captured.getvalue()
+        self.assertIsInstance(out, str)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

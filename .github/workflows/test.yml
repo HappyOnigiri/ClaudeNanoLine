@@ -18,7 +18,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install ruff mdformat
+        run: pip install ruff mdformat mdformat-gfm
 
       - name: Run CI
         run: make ci

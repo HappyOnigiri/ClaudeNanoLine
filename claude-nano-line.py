@@ -533,12 +533,12 @@ def main():
         input_data = {}
 
     cwd_real = (
-        input_data.get("workspace", {}).get("current_dir")
+        (input_data.get("workspace") or {}).get("current_dir")
         or input_data.get("cwd", "")
         or ""
     )
-    model = input_data.get("model", {}).get("display_name", "")
-    ctx_remaining = input_data.get("context_window", {}).get("remaining_percentage")
+    model = (input_data.get("model") or {}).get("display_name", "")
+    ctx_remaining = (input_data.get("context_window") or {}).get("remaining_percentage")
 
     git_branch = get_git_branch(cwd_real)
     usage = get_usage_data()

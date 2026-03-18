@@ -19,5 +19,9 @@ Thumbs.db
 # Env
 .envrc
 
+# Python
+__pycache__/
+*.pyc
+
 # Temporary
 tmp/

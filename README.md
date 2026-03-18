@@ -6,7 +6,7 @@
 
 ## スクリプト
 
-### `claude-nano-line.sh`
+### `claude-nano-line.py`
 
 Claude Code の [statusLine](https://docs.anthropic.com/ja/docs/claude-code/settings) に設定するコマンドです。
 
@@ -27,15 +27,15 @@ API 使用率は OAuth トークン（macOS はキーチェーン、Windows/Linu
 curl -fsSL https://raw.githubusercontent.com/HappyOnigiri/ClaudeNanoLine/main/setup.sh | bash
 ```
 
-`~/.claude/claude-nano-line.sh` のダウンロードと `~/.claude/settings.json` への設定追加を自動で行います。変更前に差分を表示して確認を求めます。
+`~/.claude/claude-nano-line.py` のダウンロードと `~/.claude/settings.json` への設定追加を自動で行います。変更前に差分を表示して確認を求めます。
 
 ### 手動インストール
 
 1. スクリプトを `~/.claude/` にコピーして実行権限を付与する:
 
 ```sh
-cp claude-nano-line.sh ~/.claude/
-chmod +x ~/.claude/claude-nano-line.sh
+cp claude-nano-line.py ~/.claude/
+chmod +x ~/.claude/claude-nano-line.py
 ```
 
 2. `~/.claude/settings.json` に以下を追加する:
@@ -44,17 +44,14 @@ chmod +x ~/.claude/claude-nano-line.sh
 {
   "statusLine": {
     "type": "command",
-    "command": "bash ~/.claude/claude-nano-line.sh"
+    "command": "python3 ~/.claude/claude-nano-line.py"
   }
 }
 ```
 
 ## 依存関係
 
-- `bash`
-- `jq`
-- `python3`
-- `curl`
+- `python3` (3.7 以上)
 - `security` (macOS のみ・キーチェーンアクセス用)
 
 ## Windows 対応
@@ -62,7 +59,81 @@ chmod +x ~/.claude/claude-nano-line.sh
 Git Bash または WSL 上で動作します。自動インストール・手動インストールともに、お使いの環境（Git Bash または WSL）のシェルから実行してください。
 
 - **認証**: Windows では macOS のキーチェーンが使えないため、`~/.claude/.credentials.json` からトークンを取得します。Claude Code でログイン済みであれば、このファイルは自動で作成されます。
-- **jq**: [chocolatey](https://chocolatey.org/) で `choco install jq`、または [scoop](https://scoop.sh/) で `scoop install jq` でインストールできます。
+
+## カスタマイズ
+
+環境変数 `CLAUDE_NANO_LINE_FORMAT` でステータスラインの表示内容を自由にカスタマイズできます。未設定時はデフォルトの表示になります。
+
+### 構文
+
+フォーマット文字列は `{type|options}` 形式のトークンで構成されます。
+
+**値プレースホルダー**: `{name}` または `{name|options}`
+
+```
+{5h_pct}
+{5h_pct|color:green,warn-color:yellow,alert-color:red,warn-threshold:70,alert-threshold:90}
+{5h_reset|format:dh}
+```
+
+**リテラルテキスト**: `{text:string}` または `{text:string|options}`
+
+```
+{text:[5h]|color:gray}
+{text: | |color:gray}
+```
+
+### プレースホルダー一覧
+
+| 名前        | 出力例            | 説明                  |
+| ----------- | ----------------- | --------------------- |
+| `ctx_pct`   | `73%`             | コンテキスト使用率    |
+| `5h_pct`    | `27%`             | 5 時間枠使用率        |
+| `7d_pct`    | `15%`             | 7 日枠使用率          |
+| `5h_reset`  | `3.4h`            | 5h リセット残り時間   |
+| `7d_reset`  | `6d`              | 7d リセット残り時間   |
+| `model`     | `Sonnet`          | モデル名              |
+| `cwd`       | `myproject`       | ディレクトリ basename |
+| `cwd_short` | `~/dev/proj`      | `~` 省略パス          |
+| `cwd_full`  | `/Users/.../proj` | フルパス              |
+| `branch`    | `main`            | Git ブランチ名        |
+
+### オプション一覧
+
+| key               | 対象      | 値                         | 説明                       |
+| ----------------- | --------- | -------------------------- | -------------------------- |
+| `color`           | 全て      | 色名                       | 表示色                     |
+| `warn-color`      | `*_pct`   | 色名                       | 警告時の色                 |
+| `alert-color`     | `*_pct`   | 色名                       | 危険時の色                 |
+| `warn-threshold`  | `*_pct`   | 数値                       | 警告しきい値（%）          |
+| `alert-threshold` | `*_pct`   | 数値                       | 危険しきい値（%）          |
+| `format`          | `*_reset` | `auto`/`hm`/`h1`/`dh`/`d1` | 時間フォーマット           |
+| `format`          | `*_pct`   | `pct`/`pct1`               | パーセンテージフォーマット |
+
+### 使用可能な色名
+
+`red`, `green`, `yellow`, `cyan`, `blue`, `magenta`, `gray`, `light_gray`, `sky_blue`, `pink`, `amber`, `bold`, `bold_yellow`
+
+### 設定例
+
+```bash
+# シンプル表示
+export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {7d_pct} {model}"
+
+# カスタム色・しきい値
+export CLAUDE_NANO_LINE_FORMAT="{text:[5h]|color:cyan} {5h_pct|warn-threshold:70,alert-threshold:90} {model}"
+
+# 小数表示 + 時間フォーマット固定
+export CLAUDE_NANO_LINE_FORMAT="{5h_pct|format:pct1} {text:(}{5h_reset|format:hm}{text:)} {model}"
+
+# セパレータ付き
+export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {text:|} {7d_pct} {text:|} {model} {cwd}"
+
+# デフォルトの見た目を再現
+export CLAUDE_NANO_LINE_FORMAT="{text:[ctx]|color:gray} {ctx_pct} {text:[5h]|color:gray} {5h_pct} {text:(|color:light_gray}{5h_reset}{text:)|color:light_gray} {text:[7d]|color:gray} {7d_pct} {text:(|color:light_gray}{7d_reset}{text:)|color:light_gray} {model} {cwd|color:bold_yellow}{text: (|color:cyan}{branch}{text:)|color:cyan}"
+```
+
+`~/.zprofile` や `~/.bashrc` に `export` 行を追加すれば常時有効になります。
 
 ## トラブルシューティング
 
@@ -73,7 +144,7 @@ Git Bash または WSL 上で動作します。自動インストール・手動
 
 ### `Timeout` と表示される
 
-API リクエストがタイムアウトしました。ネットワーク状況を確認し、数分後に再試行してください（360 秒キャッシュ後に自動で再取得されます）。
+API リクエストがタイムアウトしました。ネットワーク状況を確認し、数分後に再試行してください（360 秒キャッシュ後に完了後に自動で再取得されます）。
 
 ### `Usage API Rate Limit` と表示される
 

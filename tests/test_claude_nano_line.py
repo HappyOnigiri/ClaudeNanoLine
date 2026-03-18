@@ -1080,8 +1080,8 @@ class TestResetAtResolve(unittest.TestCase):
         "five_hour_pct_raw": 50.0,
         "seven_day_pct": 50,
         "seven_day_pct_raw": 50.0,
-        "five_resets_at": "2026-03-25T10:30:00Z",
-        "seven_resets_at": "2026-03-25T14:00:00Z",
+        "five_resets_at": "2099-12-25T10:30:00Z",
+        "seven_resets_at": "2099-12-25T14:00:00Z",
     }
 
     def _render(self, fmt):
@@ -1102,15 +1102,15 @@ class TestResetAtResolve(unittest.TestCase):
 
     def test_7d_reset_at_datetime_utc(self):
         result = self._render("{7d_reset_at|format:datetime,tz:utc}")
-        self.assertEqual(result, "3/25 14:00")
+        self.assertEqual(result, "12/25 14:00")
 
     def test_7d_reset_at_full_utc(self):
         result = self._render("{7d_reset_at|format:full,tz:utc}")
-        self.assertEqual(result, "2026-03-25 14:00")
+        self.assertEqual(result, "2099-12-25 14:00")
 
     def test_5h_reset_at_iso(self):
         result = self._render("{5h_reset_at|format:iso,tz:utc}")
-        self.assertIn("2026-03-25", result)
+        self.assertIn("2099-12-25", result)
         self.assertIn("10:30:00", result)
 
     def test_color_applied(self):

@@ -260,7 +260,47 @@ def fmt_reset_time(iso_str, fmt_type="auto"):
             elif secs < 86400:
                 return str(secs // 3600) + "h" + str((secs % 3600) // 60).zfill(2) + "m"
             else:
-                return str(secs // 86400) + "d"
+                days = secs // 86400
+                if days < 2:
+                    return str(days) + "d" + str((secs % 86400) // 3600) + "h"
+                return str(days) + "d"
+    except Exception:
+        return ""
+
+
+def fmt_reset_time_v2(iso_str, unit="auto", digits=1):
+    """ISO 文字列 -> unit/digits オプション付きフォーマット済み残り時間"""
+    if not iso_str:
+        return ""
+    try:
+        dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+        secs = int((dt - datetime.now(timezone.utc)).total_seconds())
+        if secs <= 0:
+            return ""
+        fmt = f".{digits}f"
+        if unit == "h":
+            h = secs / 3600
+            return f"{h:{fmt}}h"
+        elif unit == "d":
+            d = secs / 86400
+            return f"{d:{fmt}}d"
+        elif unit == "dh":
+            d_int, rem = divmod(secs, 86400)
+            h = rem / 3600
+            return f"{d_int}d {h:{fmt}}h"
+        else:  # auto
+            if secs < 3600:
+                return str(secs // 60) + "m"
+            elif secs < 36000:
+                h = secs / 3600
+                return f"{h:{fmt}}h"
+            elif secs < 86400:
+                return str(secs // 3600) + "h" + str((secs % 3600) // 60).zfill(2) + "m"
+            else:
+                days = secs // 86400
+                if days < 2:
+                    return str(days) + "d" + str((secs % 86400) // 3600) + "h"
+                return f"{days}d"
     except Exception:
         return ""
 
@@ -451,11 +491,17 @@ def render_custom(fmt, ctx_remaining, usage, model, cwd_real, git_branch):
 
             pct_int = int(int_val)
             fmt_type = opts.get("format", "pct")
-            if fmt_type == "pct1":
-                if raw_val is not None and raw_val != -1.0:
-                    val = "{:.1f}%".format(float(raw_val))
+            m = re.match(r"^pct(\d+)$", fmt_type)
+            if m:
+                n = int(m.group(1))
+                if n == 0:
+                    val = str(pct_int) + "%"
+                elif raw_val is not None and raw_val != -1.0:
+                    val = f"{float(raw_val):.{n}f}%"
                 else:
                     val = str(pct_int) + "%"
+            elif fmt_type == "pct":
+                val = str(pct_int) + "%"
             else:
                 val = str(pct_int) + "%"
 
@@ -468,15 +514,34 @@ def render_custom(fmt, ctx_remaining, usage, model, cwd_real, git_branch):
                 iso = usage.get("five_resets_at", "")
             else:
                 iso = usage.get("seven_resets_at", "")
-            fmt_t = opts.get("format", "auto")
-            val = fmt_reset_time(iso, fmt_t)
+            unit_opt = opts.get("unit", "")
+            digits_opt = opts.get("digits", "")
+            if unit_opt or digits_opt:
+                unit = unit_opt if unit_opt else "auto"
+                digits = int(digits_opt) if digits_opt else 1
+                val = fmt_reset_time_v2(iso, unit, digits)
+            else:
+                fmt_t = opts.get("format", "auto")
+                val = fmt_reset_time(iso, fmt_t)
             color = COLOR_MAP.get(opts.get("color", ""), "")
             return val, color
 
         # model
         if name == "model":
             val = model
-            color = COLOR_MAP.get(opts.get("color", ""), "") or get_model_color(val)
+            blanket = opts.get("color", "")
+            if blanket:
+                color = COLOR_MAP.get(blanket, "")
+            else:
+                m_lower = val.lower()
+                per_model_color = ""
+                if "haiku" in m_lower:
+                    per_model_color = opts.get("haiku-color", "")
+                elif "sonnet" in m_lower:
+                    per_model_color = opts.get("sonnet-color", "")
+                elif "opus" in m_lower:
+                    per_model_color = opts.get("opus-color", "")
+                color = COLOR_MAP.get(per_model_color, "") if per_model_color else get_model_color(val)
             return val, color
 
         # cwd 系

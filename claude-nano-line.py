@@ -345,7 +345,7 @@ def fmt_reset_datetime(iso_str, fmt_type="auto", tz_local=True):
         if base_fmt == "time":
             return dt.strftime("%H:%M") + tz_suffix
         elif base_fmt == "datetime":
-            return dt.strftime("%-m/%d %H:%M") + tz_suffix
+            return f"{dt.month}/{dt.day:02d} {dt.strftime('%H:%M')}" + tz_suffix
         elif base_fmt == "full":
             return dt.strftime("%Y-%m-%d %H:%M") + tz_suffix
         elif base_fmt == "iso":
@@ -354,7 +354,7 @@ def fmt_reset_datetime(iso_str, fmt_type="auto", tz_local=True):
             if dt.date() == now.date():
                 return dt.strftime("%H:%M") + tz_suffix
             else:
-                return dt.strftime("%-m/%d %H:%M") + tz_suffix
+                return f"{dt.month}/{dt.day:02d} {dt.strftime('%H:%M')}" + tz_suffix
     except Exception:
         return ""
 

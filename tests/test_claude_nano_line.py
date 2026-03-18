@@ -980,5 +980,155 @@ class TestModelPerModelColor(unittest.TestCase):
         self.assertNotIn(cnl.COLOR_MAP["green"], out)
 
 
+# ── Feature 4: fmt_reset_datetime ─────────────────────────────────────────────
+class TestFmtResetDatetime(unittest.TestCase):
+    def test_empty_string(self):
+        self.assertEqual(cnl.fmt_reset_datetime("", "auto"), "")
+
+    def test_none_returns_empty(self):
+        self.assertEqual(cnl.fmt_reset_datetime(None, "auto"), "")
+
+    def test_invalid_iso_returns_empty(self):
+        self.assertEqual(cnl.fmt_reset_datetime("not-a-date", "auto"), "")
+
+    def test_time_format_utc(self):
+        iso = "2099-01-15T10:30:00Z"
+        result = cnl.fmt_reset_datetime(iso, "time", tz_local=False)
+        self.assertEqual(result, "10:30")
+
+    def test_datetime_format_utc(self):
+        iso = "2099-01-15T10:30:00Z"
+        result = cnl.fmt_reset_datetime(iso, "datetime", tz_local=False)
+        self.assertEqual(result, "1/15 10:30")
+
+    def test_full_format_utc(self):
+        iso = "2099-01-15T10:30:00Z"
+        result = cnl.fmt_reset_datetime(iso, "full", tz_local=False)
+        self.assertEqual(result, "2099-01-15 10:30")
+
+    def test_iso_format(self):
+        iso = "2099-01-15T10:30:00Z"
+        result = cnl.fmt_reset_datetime(iso, "iso", tz_local=False)
+        self.assertIn("2099-01-15", result)
+        self.assertIn("10:30:00", result)
+        self.assertIn("+00:00", result)
+
+    def test_auto_different_day_utc(self):
+        # 遠い未来の日付は今日とは別日 → "M/D HH:MM"
+        iso = "2099-01-15T10:30:00Z"
+        result = cnl.fmt_reset_datetime(iso, "auto", tz_local=False)
+        self.assertEqual(result, "1/15 10:30")
+
+    def test_auto_same_day_utc(self):
+        # 今日の日付を動的に生成して同日テスト
+        now_utc = datetime.now(timezone.utc)
+        iso = now_utc.replace(hour=23, minute=59, second=0, microsecond=0).isoformat()
+        result = cnl.fmt_reset_datetime(iso, "auto", tz_local=False)
+        # 同日なので時刻のみ "HH:MM"
+        self.assertRegex(result, r"^\d{2}:\d{2}$")
+
+    def test_time_tz_utc(self):
+        iso = "2099-01-15T10:30:00Z"
+        result = cnl.fmt_reset_datetime(iso, "time_tz", tz_local=False)
+        self.assertEqual(result, "10:30 UTC")
+
+    def test_datetime_tz_utc(self):
+        iso = "2099-01-15T10:30:00Z"
+        result = cnl.fmt_reset_datetime(iso, "datetime_tz", tz_local=False)
+        self.assertEqual(result, "1/15 10:30 UTC")
+
+    def test_full_tz_utc(self):
+        iso = "2099-01-15T10:30:00Z"
+        result = cnl.fmt_reset_datetime(iso, "full_tz", tz_local=False)
+        self.assertEqual(result, "2099-01-15 10:30 UTC")
+
+    def test_auto_tz_different_day_utc(self):
+        iso = "2099-01-15T10:30:00Z"
+        result = cnl.fmt_reset_datetime(iso, "auto_tz", tz_local=False)
+        self.assertEqual(result, "1/15 10:30 UTC")
+
+    def test_auto_tz_same_day_utc(self):
+        now_utc = datetime.now(timezone.utc)
+        iso = now_utc.replace(hour=23, minute=59, second=0, microsecond=0).isoformat()
+        result = cnl.fmt_reset_datetime(iso, "auto_tz", tz_local=False)
+        # 同日なので "HH:MM UTC"
+        self.assertRegex(result, r"^\d{2}:\d{2} UTC$")
+
+    def test_iso_with_tz_suffix_behaves_same_as_iso(self):
+        # iso_tz は iso と同じ出力（_tz サフィックスを除去すると base_fmt="iso"）
+        iso = "2099-01-15T10:30:00Z"
+        result_iso = cnl.fmt_reset_datetime(iso, "iso", tz_local=False)
+        result_iso_tz = cnl.fmt_reset_datetime(iso, "iso_tz", tz_local=False)
+        self.assertEqual(result_iso, result_iso_tz)
+
+    def test_past_datetime_still_returns_value(self):
+        # 過去日時でも値を返す
+        iso = "2000-03-18T10:30:00Z"
+        result = cnl.fmt_reset_datetime(iso, "datetime", tz_local=False)
+        self.assertEqual(result, "3/18 10:30")
+
+    def test_z_suffix_parsed_correctly(self):
+        iso = "2099-01-15T10:30:00Z"
+        result = cnl.fmt_reset_datetime(iso, "time", tz_local=False)
+        self.assertEqual(result, "10:30")
+
+
+# ── Feature 4: resolve() integration for *_reset_at ───────────────────────────
+class TestResetAtResolve(unittest.TestCase):
+    _USAGE = {
+        "five_hour_pct": 50,
+        "five_hour_pct_raw": 50.0,
+        "seven_day_pct": 50,
+        "seven_day_pct_raw": 50.0,
+        "five_resets_at": "2026-03-25T10:30:00Z",
+        "seven_resets_at": "2026-03-25T14:00:00Z",
+    }
+
+    def _render(self, fmt):
+        return strip_ansi(cnl.render_custom(fmt, None, self._USAGE, "claude-sonnet-4-6", "", ""))
+
+    def test_5h_reset_at_default(self):
+        result = self._render("{5h_reset_at|tz:utc}")
+        # "3/25 10:30" (別日)
+        self.assertRegex(result, r"^\d+/\d+ \d{2}:\d{2}$")
+
+    def test_7d_reset_at_default(self):
+        result = self._render("{7d_reset_at|tz:utc}")
+        self.assertRegex(result, r"^\d+/\d+ \d{2}:\d{2}$")
+
+    def test_5h_reset_at_time_tz_utc(self):
+        result = self._render("{5h_reset_at|format:time_tz,tz:utc}")
+        self.assertEqual(result, "10:30 UTC")
+
+    def test_7d_reset_at_datetime_utc(self):
+        result = self._render("{7d_reset_at|format:datetime,tz:utc}")
+        self.assertEqual(result, "3/25 14:00")
+
+    def test_7d_reset_at_full_utc(self):
+        result = self._render("{7d_reset_at|format:full,tz:utc}")
+        self.assertEqual(result, "2026-03-25 14:00")
+
+    def test_5h_reset_at_iso(self):
+        result = self._render("{5h_reset_at|format:iso,tz:utc}")
+        self.assertIn("2026-03-25", result)
+        self.assertIn("10:30:00", result)
+
+    def test_color_applied(self):
+        raw = cnl.render_custom(
+            "{5h_reset_at|format:time,tz:utc,color:gray}",
+            None,
+            self._USAGE,
+            "claude-sonnet-4-6",
+            "",
+            "",
+        )
+        self.assertIn(cnl.COLOR_MAP["gray"], raw)
+
+    def test_empty_iso_returns_empty(self):
+        usage = dict(self._USAGE, five_resets_at="")
+        result = strip_ansi(cnl.render_custom("{5h_reset_at}", None, usage, "claude-sonnet-4-6", "", ""))
+        self.assertEqual(result, "")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

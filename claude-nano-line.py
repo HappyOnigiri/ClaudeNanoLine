@@ -324,6 +324,41 @@ def fmt_reset_time_v2(iso_str, unit="auto", digits=1):
         return ""
 
 
+def fmt_reset_datetime(iso_str, fmt_type="auto", tz_local=True):
+    """ISO 文字列 -> フォーマット済みリセット日時"""
+    if not iso_str:
+        return ""
+    try:
+        dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+        if tz_local:
+            dt = dt.astimezone()
+            now = datetime.now().astimezone()
+        else:
+            dt = dt.astimezone(timezone.utc)
+            now = datetime.now(timezone.utc)
+
+        # _tz サフィックスの判定・除去
+        show_tz = fmt_type.endswith("_tz")
+        base_fmt = fmt_type.removesuffix("_tz") if show_tz else fmt_type
+        tz_suffix = " " + dt.strftime("%Z") if show_tz else ""
+
+        if base_fmt == "time":
+            return dt.strftime("%H:%M") + tz_suffix
+        elif base_fmt == "datetime":
+            return dt.strftime("%-m/%d %H:%M") + tz_suffix
+        elif base_fmt == "full":
+            return dt.strftime("%Y-%m-%d %H:%M") + tz_suffix
+        elif base_fmt == "iso":
+            return dt.isoformat()
+        else:  # auto
+            if dt.date() == now.date():
+                return dt.strftime("%H:%M") + tz_suffix
+            else:
+                return dt.strftime("%-m/%d %H:%M") + tz_suffix
+    except Exception:
+        return ""
+
+
 def colorize(text, color_code):
     if color_code:
         return color_code + text + RESET
@@ -506,6 +541,17 @@ def render_custom(fmt, ctx_remaining, usage, model, cwd_real, git_branch):
             else:
                 fmt_t = opts.get("format", "auto")
                 val = fmt_reset_time(iso, fmt_t)
+            color = COLOR_MAP.get(opts.get("color", ""), "")
+            return val, color
+
+        if name in ("5h_reset_at", "7d_reset_at"):
+            if name == "5h_reset_at":
+                iso = usage.get("five_resets_at", "")
+            else:
+                iso = usage.get("seven_resets_at", "")
+            fmt_t = opts.get("format", "auto")
+            tz_local = opts.get("tz", "local") != "utc"
+            val = fmt_reset_datetime(iso, fmt_t, tz_local)
             color = COLOR_MAP.get(opts.get("color", ""), "")
             return val, color
 

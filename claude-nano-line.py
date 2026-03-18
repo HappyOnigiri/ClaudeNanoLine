@@ -23,12 +23,14 @@ API_USER_AGENT = "ClaudeDesktop/2.0.5"
 API_VERSION = "2023-06-01"
 API_BETA = "oauth-2025-04-20"
 
+
 # ── Paths ───────────────────────────────────────────────────────────────────────
 def _resolve_xdg_dir(env_name: str, fallback: Path) -> Path:
     value = os.environ.get(env_name)
     if value and Path(value).is_absolute():
         return Path(value)
     return fallback
+
 
 _xdg_cache = _resolve_xdg_dir("XDG_CACHE_HOME", Path.home() / ".cache")
 _xdg_state = _resolve_xdg_dir("XDG_STATE_HOME", Path.home() / ".local" / "state")

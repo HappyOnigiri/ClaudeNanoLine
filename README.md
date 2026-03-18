@@ -1,44 +1,51 @@
 # ClaudeNanoLine
 
-5時間枠・7日枠の API 利用量とリセットまでの残り時間を、1行で把握できる Claude Code ステータスラインです。
+[日本語版はこちら](README.ja.md)
+
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+![macOS](https://img.shields.io/badge/macOS-supported-brightgreen)
+![Windows](https://img.shields.io/badge/Windows-supported-brightgreen)
+![Linux](https://img.shields.io/badge/Linux-supported-brightgreen)
+
+A single-line Claude Code status bar showing API usage (5-hour and 7-day windows) and time until reset.
 
 ![demo](demo.png)
 
-## スクリプト
+## Script
 
 ### `claude-nano-line.py`
 
-Claude Code の [statusLine](https://docs.anthropic.com/ja/docs/claude-code/settings) に設定するコマンドです。
+A command to set as the Claude Code [statusLine](https://docs.anthropic.com/en/docs/claude-code/settings).
 
-以下の情報をターミナルのステータスバーに表示します:
+Displays the following in your terminal status bar:
 
-- **作業ディレクトリ** と **Git ブランチ**
-- **使用中のモデル名**
-- **コンテキスト使用率** (緑 / 黄 / 赤でカラー表示)
-- **API 使用率**: 5 時間枠・7 日枠の utilization % とリセットまでの残り時間
+- **Working directory** and **Git branch**
+- **Active model name**
+- **Context usage** (color-coded: green / yellow / red)
+- **API usage**: 5-hour and 7-day window utilization % and time until reset
 
-API 使用率は OAuth トークン（macOS はキーチェーン、Windows/Linux は `~/.claude/.credentials.json`）を使って Anthropic API から取得します。360 秒間キャッシュします (`$XDG_CACHE_HOME/claude-nano-line/claude-usage-cache.json`、デフォルト: `~/.cache/claude-nano-line/`)。
+API usage is fetched from the Anthropic API using an OAuth token (macOS Keychain, or `~/.claude/.credentials.json` on Windows/Linux). Results are cached for 360 seconds at `$XDG_CACHE_HOME/claude-nano-line/claude-usage-cache.json` (default: `~/.cache/claude-nano-line/`).
 
-## セットアップ
+## Setup
 
-### 自動インストール (推奨)
+### Automatic install (recommended)
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/HappyOnigiri/ClaudeNanoLine/main/setup.sh | bash
 ```
 
-`~/.claude/claude-nano-line.py` のダウンロードと `~/.claude/settings.json` への設定追加を自動で行います。変更前に差分を表示して確認を求めます。
+Downloads `~/.claude/claude-nano-line.py` and adds the configuration to `~/.claude/settings.json`. Shows a diff and asks for confirmation before making changes.
 
-### 手動インストール
+### Manual install
 
-1. スクリプトを `~/.claude/` にコピーして実行権限を付与する:
+1. Copy the script to `~/.claude/` and make it executable:
 
 ```sh
 cp claude-nano-line.py ~/.claude/
 chmod +x ~/.claude/claude-nano-line.py
 ```
 
-2. `~/.claude/settings.json` に以下を追加する:
+2. Add the following to `~/.claude/settings.json`:
 
 ```json
 {
@@ -49,26 +56,26 @@ chmod +x ~/.claude/claude-nano-line.py
 }
 ```
 
-## 依存関係
+## Requirements
 
-- `python3` (3.7 以上)
-- `security` (macOS のみ・キーチェーンアクセス用)
+- `python3` (3.7 or later)
+- `security` (macOS only — for Keychain access)
 
-## Windows 対応
+## Windows support
 
-Git Bash または WSL 上で動作します。自動インストール・手動インストールともに、お使いの環境（Git Bash または WSL）のシェルから実行してください。
+Works on Git Bash or WSL. Run the installer (automatic or manual) from your Git Bash or WSL shell.
 
-- **認証**: Windows では macOS のキーチェーンが使えないため、`~/.claude/.credentials.json` からトークンを取得します。Claude Code でログイン済みであれば、このファイルは自動で作成されます。
+- **Authentication**: Since macOS Keychain is unavailable on Windows, the token is read from `~/.claude/.credentials.json`. This file is created automatically when you log in with Claude Code.
 
-## カスタマイズ
+## Customization
 
-環境変数 `CLAUDE_NANO_LINE_FORMAT` でステータスラインの表示内容を自由にカスタマイズできます。未設定時はデフォルトの表示になります。
+Set the `CLAUDE_NANO_LINE_FORMAT` environment variable to customize the status line output. If not set, the default layout is used.
 
-### 構文
+### Syntax
 
-フォーマット文字列は `{type|options}` 形式のトークンで構成されます。
+The format string is composed of tokens in `{type|options}` form.
 
-**値プレースホルダー**: `{name}` または `{name|options}`
+**Value placeholders**: `{name}` or `{name|options}`
 
 ```
 {5h_pct}
@@ -76,91 +83,91 @@ Git Bash または WSL 上で動作します。自動インストール・手動
 {5h_reset|format:dh}
 ```
 
-**リテラルテキスト**: `{text:string}` または `{text:string|options}`
+**Literal text**: `{text:string}` or `{text:string|options}`
 
 ```
 {text:[5h]|color:gray}
 {text: | |color:gray}
 ```
 
-### プレースホルダー一覧
+### Placeholder reference
 
-| 名前        | 出力例            | 説明                  |
-| ----------- | ----------------- | --------------------- |
-| `ctx_pct`   | `73%`             | コンテキスト使用率    |
-| `5h_pct`    | `27%`             | 5 時間枠使用率        |
-| `7d_pct`    | `15%`             | 7 日枠使用率          |
-| `5h_reset`  | `3.4h`            | 5h リセット残り時間   |
-| `7d_reset`  | `6d`              | 7d リセット残り時間   |
-| `model`     | `Sonnet`          | モデル名              |
-| `cwd`       | `myproject`       | ディレクトリ basename |
-| `cwd_short` | `~/dev/proj`      | `~` 省略パス          |
-| `cwd_full`  | `/Users/.../proj` | フルパス              |
-| `branch`    | `main`            | Git ブランチ名        |
+| Name        | Example           | Description                        |
+| ----------- | ----------------- | ---------------------------------- |
+| `ctx_pct`   | `73%`             | Context window usage               |
+| `5h_pct`    | `27%`             | 5-hour window usage                |
+| `7d_pct`    | `15%`             | 7-day window usage                 |
+| `5h_reset`  | `3.4h`            | Time until 5h window reset         |
+| `7d_reset`  | `6d`              | Time until 7d window reset         |
+| `model`     | `Sonnet`          | Model name                         |
+| `cwd`       | `myproject`       | Directory basename                 |
+| `cwd_short` | `~/dev/proj`      | `~`-abbreviated path               |
+| `cwd_full`  | `/Users/.../proj` | Full path                          |
+| `branch`    | `main`            | Git branch name                    |
 
-### オプション一覧
+### Option reference
 
-| key               | 対象      | 値                         | デフォルト | 説明                                                            |
-| ----------------- | --------- | -------------------------- | ---------- | --------------------------------------------------------------- |
-| `color`           | 全て      | 色名                       | なし       | 表示色                                                          |
-| `warn-color`      | `*_pct`   | 色名                       | `yellow`   | 警告時の色                                                      |
-| `alert-color`     | `*_pct`   | 色名                       | `red`      | 危険時の色                                                      |
-| `warn-threshold`  | `*_pct`   | 数値                       | `80`       | 警告しきい値（%）                                               |
-| `alert-threshold` | `*_pct`   | 数値                       | `95`       | 危険しきい値（%）                                               |
-| `format`          | `*_pct`   | `pct` / `pctN`             | `pct`      | 小数桁数指定（例: `pct2` → `42.73%`）                           |
-| `format`          | `*_reset` | `auto`/`hm`/`h1`/`dh`/`d1` | `auto`     | 時間フォーマット（従来オプション）                              |
-| `unit`            | `*_reset` | `auto` / `h` / `d` / `dh`  | `auto`     | 表示単位（`h`=時間固定, `d`=日固定, `dh`=日+時間, `auto`=自動） |
-| `digits`          | `*_reset` | 数値                       | `1`        | 小数桁数（例: `digits:2` → `2.50h`）                            |
-| `haiku-color`     | `model`   | 色名                       | `amber`    | Haiku モデル時の色                                              |
-| `sonnet-color`    | `model`   | 色名                       | `sky_blue` | Sonnet モデル時の色                                             |
-| `opus-color`      | `model`   | 色名                       | `pink`     | Opus モデル時の色                                               |
+| Key               | Applies to | Values                      | Default    | Description                                                       |
+| ----------------- | ---------- | --------------------------- | ---------- | ----------------------------------------------------------------- |
+| `color`           | all        | color name                  | none       | Display color                                                     |
+| `warn-color`      | `*_pct`    | color name                  | `yellow`   | Color when usage exceeds warn threshold                           |
+| `alert-color`     | `*_pct`    | color name                  | `red`      | Color when usage exceeds alert threshold                          |
+| `warn-threshold`  | `*_pct`    | number                      | `80`       | Warning threshold (%)                                             |
+| `alert-threshold` | `*_pct`    | number                      | `95`       | Alert threshold (%)                                               |
+| `format`          | `*_pct`    | `pct` / `pctN`              | `pct`      | Decimal places (e.g. `pct2` → `42.73%`)                          |
+| `format`          | `*_reset`  | `auto`/`hm`/`h1`/`dh`/`d1` | `auto`     | Time format (legacy option)                                       |
+| `unit`            | `*_reset`  | `auto` / `h` / `d` / `dh`  | `auto`     | Display unit (`h`=hours, `d`=days, `dh`=days+hours, `auto`=auto) |
+| `digits`          | `*_reset`  | number                      | `1`        | Decimal places (e.g. `digits:2` → `2.50h`)                       |
+| `haiku-color`     | `model`    | color name                  | `amber`    | Color for Haiku model                                             |
+| `sonnet-color`    | `model`    | color name                  | `sky_blue` | Color for Sonnet model                                            |
+| `opus-color`      | `model`    | color name                  | `pink`     | Color for Opus model                                              |
 
-### 使用可能な色名
+### Available color names
 
 `red`, `green`, `yellow`, `cyan`, `blue`, `magenta`, `gray`, `light_gray`, `sky_blue`, `pink`, `amber`, `bold`, `bold_yellow`
 
-### 設定例
+### Examples
 
 ```bash
-# シンプル表示
+# Simple display
 export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {7d_pct} {model}"
 
-# カスタム色・しきい値
+# Custom colors and thresholds
 export CLAUDE_NANO_LINE_FORMAT="{text:[5h]|color:cyan} {5h_pct|warn-threshold:70,alert-threshold:90} {model}"
 
-# 小数2桁表示 + リセット時間を時間単位・小数2桁で表示
+# Two decimal places + reset time in hours with 2 decimal places
 export CLAUDE_NANO_LINE_FORMAT="{5h_pct|format:pct2} {text:(}{5h_reset|unit:h,digits:2}{text:)} {model}"
 
-# リセット時間を日+時間で整数表示
+# Reset time as days+hours with no decimals
 export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {text:(}{5h_reset|unit:dh,digits:0}{text:)} {7d_pct} {model}"
 
-# モデルごとに色を変える
+# Per-model colors
 export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {model|haiku-color:green,sonnet-color:yellow,opus-color:blue} {cwd}"
 
-# セパレータ付き
+# With separators
 export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {text:|} {7d_pct} {text:|} {model} {cwd}"
 
-# デフォルトの見た目を再現
+# Reproduce default layout
 export CLAUDE_NANO_LINE_FORMAT="{text:[ctx]|color:gray} {ctx_pct} {text:[5h]|color:gray} {5h_pct} {text:(|color:light_gray}{5h_reset}{text:)|color:light_gray} {text:[7d]|color:gray} {7d_pct} {text:(|color:light_gray}{7d_reset}{text:)|color:light_gray} {model} {cwd|color:bold_yellow}{text: (|color:cyan}{branch}{text:)|color:cyan}"
 ```
 
-`~/.zprofile` や `~/.bashrc` に `export` 行を追加すれば常時有効になります。
+Add the `export` line to `~/.zprofile` or `~/.bashrc` to apply it permanently.
 
-## トラブルシューティング
+## Troubleshooting
 
-### API 使用率が `[5h] --%` / `[7d] --%` と表示される
+### API usage shows `[5h] --%` / `[7d] --%`
 
-- **トークン未取得**: Claude Code で一度ログインしてください。macOS はキーチェーン、Windows/Linux は `~/.claude/.credentials.json` にトークンが保存されます。
-- **ネットワーク**: API への接続に失敗している可能性があります。ファイアウォールやプロキシ設定を確認してください。
+- **No token**: Log in with Claude Code at least once. The token is stored in the macOS Keychain or `~/.claude/.credentials.json` on Windows/Linux.
+- **Network**: The API may be unreachable. Check your firewall or proxy settings.
 
-### `Timeout` と表示される
+### Shows `Timeout`
 
-API リクエストがタイムアウトしました。ネットワーク状況を確認し、数分後に再試行してください（360 秒キャッシュ後に完了後に自動で再取得されます）。
+The API request timed out. Check your network connection and wait a few minutes (the cache expires after 360 seconds and will retry automatically).
 
-### `Usage API Rate Limit` と表示される
+### Shows `Usage API Rate Limit`
 
-API のレート制限に達しました。しばらく待つと自動で復旧します。
+The API rate limit was hit. It will recover automatically after a short wait.
 
-### ログの確認
+### Checking logs
 
-API 呼び出しの詳細は `$XDG_STATE_HOME/claude-nano-line/claude-usage-api.log`（デフォルト: `~/.local/state/claude-nano-line/`）に記録されます。問題の切り分けに役立ちます。
+Detailed API call logs are written to `$XDG_STATE_HOME/claude-nano-line/claude-usage-api.log` (default: `~/.local/state/claude-nano-line/`), which can help diagnose issues.

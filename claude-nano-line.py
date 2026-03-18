@@ -24,8 +24,14 @@ API_VERSION = "2023-06-01"
 API_BETA = "oauth-2025-04-20"
 
 # ── Paths ───────────────────────────────────────────────────────────────────────
-_xdg_cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
-_xdg_state = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state")
+def _resolve_xdg_dir(env_name: str, fallback: Path) -> Path:
+    value = os.environ.get(env_name)
+    if value and Path(value).is_absolute():
+        return Path(value)
+    return fallback
+
+_xdg_cache = _resolve_xdg_dir("XDG_CACHE_HOME", Path.home() / ".cache")
+_xdg_state = _resolve_xdg_dir("XDG_STATE_HOME", Path.home() / ".local" / "state")
 CACHE_DIR = _xdg_cache / "claude-nano-line"
 CACHE_FILE = CACHE_DIR / "claude-usage-cache.json"
 LOG_DIR = _xdg_state / "claude-nano-line"

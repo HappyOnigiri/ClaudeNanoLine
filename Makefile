@@ -33,7 +33,7 @@ ci:
 lint:
 	ruff format claude-nano-line.py tests/
 	ruff check claude-nano-line.py tests/ --fix
-	mdformat --wrap 80 *.md
+	mdformat --wrap 80 $(shell ls *.md | grep -v CHANGELOG.md)
 
 repomix:
 	@mkdir -p tmp/repomix

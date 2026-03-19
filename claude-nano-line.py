@@ -8,6 +8,8 @@
 # Customize output via CLAUDE_NANO_LINE_FORMAT environment variable.
 """Claude Code status line - API usage, model, cwd, git branch."""
 
+from __future__ import annotations
+
 import json
 import os
 import queue

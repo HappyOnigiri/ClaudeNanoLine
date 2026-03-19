@@ -100,34 +100,41 @@ WSL）のシェルから実行してください。
 
 ### プレースホルダー一覧
 
-| 名前        | 出力例            | 説明                  |
-| ----------- | ----------------- | --------------------- |
-| `ctx_pct`   | `73%`             | コンテキスト使用率    |
-| `5h_pct`    | `27%`             | 5 時間枠使用率        |
-| `7d_pct`    | `15%`             | 7 日枠使用率          |
-| `5h_reset`  | `3.4h`            | 5h リセット残り時間   |
-| `7d_reset`  | `6d`              | 7d リセット残り時間   |
-| `model`     | `Sonnet`          | モデル名              |
-| `cwd`       | `myproject`       | ディレクトリ basename |
-| `cwd_short` | `~/dev/proj`      | `~` 省略パス          |
-| `cwd_full`  | `/Users/.../proj` | フルパス              |
-| `branch`    | `main`            | Git ブランチ名        |
+| 名前           | 出力例            | 説明                                                                  |
+| -------------- | ----------------- | --------------------------------------------------------------------- |
+| `ctx_pct`      | `73%`             | コンテキスト使用率                                                    |
+| `5h_pct`       | `27%`             | 5 時間枠使用率                                                        |
+| `7d_pct`       | `15%`             | 7 日枠使用率                                                          |
+| `5h_reset`     | `3.4h`            | 5h リセット残り時間                                                   |
+| `7d_reset`     | `6d`              | 7d リセット残り時間                                                   |
+| `5h_reset_at`  | `18:30`           | 5h リセット日時                                                       |
+| `7d_reset_at`  | `3/25 09:00`      | 7d リセット日時                                                       |
+| `model`        | `Sonnet`          | モデル名                                                              |
+| `cwd`          | `myproject`       | ディレクトリ basename                                                 |
+| `cwd_short`    | `~/dev/proj`      | `~` 省略パス                                                          |
+| `cwd_full`     | `/Users/.../proj` | フルパス                                                              |
+| `branch`       | `main`            | Git ブランチ名                                                        |
+| `branch_dirty` | `main*`           | Git ブランチ名（未コミット変更がある場合に `*` などのマーカーを付加） |
 
 ### オプション一覧
 
-| key               | 対象      | 値                         | デフォルト | 説明                                                            |
-| ----------------- | --------- | -------------------------- | ---------- | --------------------------------------------------------------- |
-| `color`           | 全て      | 色名                       | なし       | 表示色                                                          |
-| `warn-color`      | `*_pct`   | 色名                       | `yellow`   | 警告時の色                                                      |
-| `alert-color`     | `*_pct`   | 色名                       | `red`      | 危険時の色                                                      |
-| `warn-threshold`  | `*_pct`   | 数値                       | `80`       | 警告しきい値（%）                                               |
-| `alert-threshold` | `*_pct`   | 数値                       | `95`       | 危険しきい値（%）                                               |
-| `format`          | `*_reset` | `auto`/`hm`/`h1`/`dh`/`d1` | `auto`     | 時間フォーマット（従来オプション）                              |
-| `unit`            | `*_reset` | `auto` / `h` / `d` / `dh`  | `auto`     | 表示単位（`h`=時間固定, `d`=日固定, `dh`=日+時間, `auto`=自動） |
-| `digits`          | `*_reset` | 数値                       | `1`        | 小数桁数（例: `digits:2` → `2.50h`）                            |
-| `haiku-color`     | `model`   | 色名                       | `amber`    | Haiku モデル時の色                                              |
-| `sonnet-color`    | `model`   | 色名                       | `sky_blue` | Sonnet モデル時の色                                             |
-| `opus-color`      | `model`   | 色名                       | `pink`     | Opus モデル時の色                                               |
+| key               | 対象                     | 値                                                                                | デフォルト               | 説明                                                                                                  |
+| ----------------- | ------------------------ | --------------------------------------------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `color`           | 全て                     | 色名                                                                              | なし                     | 表示色                                                                                                |
+| `warn-color`      | `*_pct`                  | 色名                                                                              | `yellow`                 | 警告時の色                                                                                            |
+| `alert-color`     | `*_pct`                  | 色名                                                                              | `red`                    | 危険時の色                                                                                            |
+| `warn-threshold`  | `*_pct`                  | 数値                                                                              | `80`                     | 警告しきい値（%）                                                                                     |
+| `alert-threshold` | `*_pct`                  | 数値                                                                              | `95`                     | 危険しきい値（%）                                                                                     |
+| `format`          | `*_reset`                | `auto`/`hm`/`h1`/`dh`/`d1`                                                        | `auto`                   | 時間フォーマット（従来オプション）                                                                    |
+| `unit`            | `*_reset`                | `auto` / `h` / `d` / `dh`                                                         | `auto`                   | 表示単位（`h`=時間固定, `d`=日固定, `dh`=日+時間, `auto`=自動）                                       |
+| `digits`          | `*_reset`                | 数値                                                                              | `1`                      | 小数桁数（例: `digits:2` → `2.50h`）                                                                  |
+| `format`          | `*_reset_at`             | `auto`/`auto_tz`/`time`/`time_tz`/`datetime`/`datetime_tz`/`full`/`full_tz`/`iso` | `auto`                   | 日時フォーマット（`auto`=今日なら時刻のみ、別日なら`M/D HH:MM`）                                      |
+| `tz`              | `*_reset_at`             | `local` / `utc`                                                                   | `local`                  | 表示タイムゾーン                                                                                      |
+| `dirty-suffix`    | `branch`, `branch_dirty` | 文字列                                                                            | `*` / `""`               | dirty 時に付加するサフィックス（`branch_dirty` デフォルト: `*`、`branch` はデフォルト空でオプトイン） |
+| `dirty-color`     | `branch`, `branch_dirty` | 色名                                                                              | `color` にフォールバック | dirty 時の色                                                                                          |
+| `haiku-color`     | `model`                  | 色名                                                                              | `amber`                  | Haiku モデル時の色                                                                                    |
+| `sonnet-color`    | `model`                  | 色名                                                                              | `sky_blue`               | Sonnet モデル時の色                                                                                   |
+| `opus-color`      | `model`                  | 色名                                                                              | `pink`                   | Opus モデル時の色                                                                                     |
 
 ### 使用可能な色名
 
@@ -157,6 +164,15 @@ export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {text:|} {7d_pct} {text:|} {model} {cwd
 
 # デフォルトの見た目を再現
 export CLAUDE_NANO_LINE_FORMAT="{text:[ctx]|color:gray} {ctx_pct} {text:[5h]|color:gray} {5h_pct} {text:(|color:light_gray}{5h_reset}{text:)|color:light_gray} {text:[7d]|color:gray} {7d_pct} {text:(|color:light_gray}{7d_reset}{text:)|color:light_gray} {model} {cwd|color:bold_yellow}{text: (|color:cyan}{branch}{text:)|color:cyan}"
+
+# Git dirty 表示（未コミット変更があると "main*" と表示）
+export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {model} {cwd} {branch_dirty}"
+
+# dirty 時に色を変える（clean: cyan、dirty: yellow）
+export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {model} {cwd} {branch_dirty|color:cyan,dirty-color:yellow}"
+
+# {branch} にオプトインで dirty マーカーを付加
+export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {model} {cwd} {branch|dirty-suffix:!,dirty-color:red}"
 ```
 
 `~/.zprofile` や `~/.bashrc` に `export` 行を追加すれば常時有効になります。

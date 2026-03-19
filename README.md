@@ -103,38 +103,41 @@ The format string is composed of tokens in `{type|options}` form.
 
 ### Placeholder reference
 
-| Name          | Example           | Description                |
-| ------------- | ----------------- | -------------------------- |
-| `ctx_pct`     | `73%`             | Context window usage       |
-| `5h_pct`      | `27%`             | 5-hour window usage        |
-| `7d_pct`      | `15%`             | 7-day window usage         |
-| `5h_reset`    | `3.4h`            | Time until 5h window reset |
-| `7d_reset`    | `6d`              | Time until 7d window reset |
-| `5h_reset_at` | `18:30`           | Reset time of 5h window    |
-| `7d_reset_at` | `3/25 09:00`      | Reset time of 7d window    |
-| `model`       | `Sonnet`          | Model name                 |
-| `cwd`         | `myproject`       | Directory basename         |
-| `cwd_short`   | `~/dev/proj`      | `~`-abbreviated path       |
-| `cwd_full`    | `/Users/.../proj` | Full path                  |
-| `branch`      | `main`            | Git branch name            |
+| Name           | Example           | Description                                                            |
+| -------------- | ----------------- | ---------------------------------------------------------------------- |
+| `ctx_pct`      | `73%`             | Context window usage                                                   |
+| `5h_pct`       | `27%`             | 5-hour window usage                                                    |
+| `7d_pct`       | `15%`             | 7-day window usage                                                     |
+| `5h_reset`     | `3.4h`            | Time until 5h window reset                                             |
+| `7d_reset`     | `6d`              | Time until 7d window reset                                             |
+| `5h_reset_at`  | `18:30`           | Reset time of 5h window                                                |
+| `7d_reset_at`  | `3/25 09:00`      | Reset time of 7d window                                                |
+| `model`        | `Sonnet`          | Model name                                                             |
+| `cwd`          | `myproject`       | Directory basename                                                     |
+| `cwd_short`    | `~/dev/proj`      | `~`-abbreviated path                                                   |
+| `cwd_full`     | `/Users/.../proj` | Full path                                                              |
+| `branch`       | `main`            | Git branch name                                                        |
+| `branch_dirty` | `main*`           | Git branch name with dirty marker (`*` when uncommitted changes exist) |
 
 ### Option reference
 
-| Key               | Applies to   | Values                                                                            | Default    | Description                                                          |
-| ----------------- | ------------ | --------------------------------------------------------------------------------- | ---------- | -------------------------------------------------------------------- |
-| `color`           | all          | color name                                                                        | none       | Display color                                                        |
-| `warn-color`      | `*_pct`      | color name                                                                        | `yellow`   | Color when usage exceeds warn threshold                              |
-| `alert-color`     | `*_pct`      | color name                                                                        | `red`      | Color when usage exceeds alert threshold                             |
-| `warn-threshold`  | `*_pct`      | number                                                                            | `80`       | Warning threshold (%)                                                |
-| `alert-threshold` | `*_pct`      | number                                                                            | `95`       | Alert threshold (%)                                                  |
-| `format`          | `*_reset`    | `auto`/`hm`/`h1`/`dh`/`d1`                                                        | `auto`     | Time format (legacy option)                                          |
-| `unit`            | `*_reset`    | `auto` / `h` / `d` / `dh`                                                         | `auto`     | Display unit (`h`=hours, `d`=days, `dh`=days+hours, `auto`=auto)     |
-| `digits`          | `*_reset`    | number                                                                            | `1`        | Decimal places (e.g. `digits:2` → `2.50h`)                           |
-| `format`          | `*_reset_at` | `auto`/`auto_tz`/`time`/`time_tz`/`datetime`/`datetime_tz`/`full`/`full_tz`/`iso` | `auto`     | Datetime format (`auto`=time if today, `M/D HH:MM` if different day) |
-| `tz`              | `*_reset_at` | `local` / `utc`                                                                   | `local`    | Timezone for display                                                 |
-| `haiku-color`     | `model`      | color name                                                                        | `amber`    | Color for Haiku model                                                |
-| `sonnet-color`    | `model`      | color name                                                                        | `sky_blue` | Color for Sonnet model                                               |
-| `opus-color`      | `model`      | color name                                                                        | `pink`     | Color for Opus model                                                 |
+| Key               | Applies to               | Values                                                                            | Default               | Description                                                                                            |
+| ----------------- | ------------------------ | --------------------------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------ |
+| `color`           | all                      | color name                                                                        | none                  | Display color                                                                                          |
+| `warn-color`      | `*_pct`                  | color name                                                                        | `yellow`              | Color when usage exceeds warn threshold                                                                |
+| `alert-color`     | `*_pct`                  | color name                                                                        | `red`                 | Color when usage exceeds alert threshold                                                               |
+| `warn-threshold`  | `*_pct`                  | number                                                                            | `80`                  | Warning threshold (%)                                                                                  |
+| `alert-threshold` | `*_pct`                  | number                                                                            | `95`                  | Alert threshold (%)                                                                                    |
+| `format`          | `*_reset`                | `auto`/`hm`/`h1`/`dh`/`d1`                                                        | `auto`                | Time format (legacy option)                                                                            |
+| `unit`            | `*_reset`                | `auto` / `h` / `d` / `dh`                                                         | `auto`                | Display unit (`h`=hours, `d`=days, `dh`=days+hours, `auto`=auto)                                       |
+| `digits`          | `*_reset`                | number                                                                            | `1`                   | Decimal places (e.g. `digits:2` → `2.50h`)                                                             |
+| `format`          | `*_reset_at`             | `auto`/`auto_tz`/`time`/`time_tz`/`datetime`/`datetime_tz`/`full`/`full_tz`/`iso` | `auto`                | Datetime format (`auto`=time if today, `M/D HH:MM` if different day)                                   |
+| `tz`              | `*_reset_at`             | `local` / `utc`                                                                   | `local`               | Timezone for display                                                                                   |
+| `dirty-suffix`    | `branch`, `branch_dirty` | string                                                                            | `*` / `""`            | Suffix appended when repo is dirty (`branch_dirty` default: `*`; `branch` default: `""` — opt-in only) |
+| `dirty-color`     | `branch`, `branch_dirty` | color name                                                                        | falls back to `color` | Color when repo is dirty                                                                               |
+| `haiku-color`     | `model`                  | color name                                                                        | `amber`               | Color for Haiku model                                                                                  |
+| `sonnet-color`    | `model`                  | color name                                                                        | `sky_blue`            | Color for Sonnet model                                                                                 |
+| `opus-color`      | `model`                  | color name                                                                        | `pink`                | Color for Opus model                                                                                   |
 
 ### Available color names
 
@@ -173,6 +176,15 @@ export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {5h_reset_at|format:time_tz} {7d_pct} {
 
 # Show in UTC
 export CLAUDE_NANO_LINE_FORMAT="{5h_reset_at|tz:utc,format:auto_tz} {7d_reset_at|tz:utc,format:full}"
+
+# Git dirty indicator (shows "main*" when there are uncommitted changes)
+export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {model} {cwd} {branch_dirty}"
+
+# Git dirty with color change (cyan when clean, yellow when dirty)
+export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {model} {cwd} {branch_dirty|color:cyan,dirty-color:yellow}"
+
+# Opt-in dirty marker on {branch} with custom suffix
+export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {model} {cwd} {branch|dirty-suffix:!,dirty-color:red}"
 ```
 
 Add the `export` line to `~/.zprofile` or `~/.bashrc` to apply it permanently.

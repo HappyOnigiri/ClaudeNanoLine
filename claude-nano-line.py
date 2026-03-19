@@ -11,6 +11,8 @@
 import json
 import os
 import re
+import select
+import signal
 import subprocess
 import sys
 import tempfile
@@ -23,6 +25,8 @@ from urllib.request import Request, urlopen
 # ── Configuration ──────────────────────────────────────────────────────────────
 CACHE_TTL = 360
 HTTP_TIMEOUT = 5
+GLOBAL_TIMEOUT = 10
+STDIN_TIMEOUT = 3
 DEFAULT_WARN_PCT = 80
 DEFAULT_CRIT_PCT = 95
 API_URL = "https://api.anthropic.com/api/oauth/usage"
@@ -38,6 +42,8 @@ def _resolve_xdg_dir(env_name: str, fallback: Path) -> Path:
         return Path(value)
     return fallback
 
+
+os.environ.setdefault("GIT_OPTIONAL_LOCKS", "0")
 
 _xdg_cache = _resolve_xdg_dir("XDG_CACHE_HOME", Path.home() / ".cache")
 _xdg_state = _resolve_xdg_dir("XDG_STATE_HOME", Path.home() / ".local" / "state")
@@ -70,14 +76,11 @@ def get_git_branch(cwd):
     if not cwd:
         return ""
     try:
-        env = os.environ.copy()
-        env["GIT_OPTIONAL_LOCKS"] = "0"
         result = subprocess.run(
             ["git", "-C", cwd, "symbolic-ref", "--short", "HEAD"],
             capture_output=True,
             text=True,
             timeout=5,
-            env=env,
         )
         if result.returncode == 0:
             return result.stdout.strip()
@@ -621,8 +624,22 @@ def render_custom(fmt, ctx_remaining, usage, model, cwd_real, git_branch):
 
 # ── Main ────────────────────────────────────────────────────────────────────────
 def main():
+    if hasattr(signal, "SIGALRM"):
+
+        def _timeout_handler(signum, frame):
+            os._exit(124)
+
+        signal.signal(signal.SIGALRM, _timeout_handler)
+        signal.alarm(GLOBAL_TIMEOUT)
+
     try:
-        input_data = json.loads(sys.stdin.read())
+        ready, _, _ = select.select([sys.stdin], [], [], STDIN_TIMEOUT)
+        raw = sys.stdin.read() if ready else None
+    except (OSError, ValueError):
+        # select not supported (e.g., StringIO in tests, Windows)
+        raw = sys.stdin.read()
+    try:
+        input_data = json.loads(raw) if raw else {}
     except Exception:
         input_data = {}
 
@@ -643,8 +660,15 @@ def main():
             cwd_base = cwd_short
         output = render_legacy(ctx_remaining, usage, model, cwd_base, git_branch)
 
-    print(output, end="")
+    buf = getattr(sys.stdout, "buffer", None)
+    if buf is not None:
+        buf.write(output.encode())
+        buf.flush()
+    else:
+        sys.stdout.write(output)
+        sys.stdout.flush()
 
 
 if __name__ == "__main__":
     main()
+    os._exit(0)

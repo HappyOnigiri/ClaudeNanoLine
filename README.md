@@ -114,7 +114,6 @@ The format string is composed of tokens in `{type|options}` form.
 | `alert-color`     | `*_pct`    | color name                  | `red`      | Color when usage exceeds alert threshold                          |
 | `warn-threshold`  | `*_pct`    | number                      | `80`       | Warning threshold (%)                                             |
 | `alert-threshold` | `*_pct`    | number                      | `95`       | Alert threshold (%)                                               |
-| `format`          | `*_pct`    | `pct` / `pctN`              | `pct`      | Decimal places (e.g. `pct2` → `42.73%`)                          |
 | `format`          | `*_reset`  | `auto`/`hm`/`h1`/`dh`/`d1` | `auto`     | Time format (legacy option)                                       |
 | `unit`            | `*_reset`  | `auto` / `h` / `d` / `dh`  | `auto`     | Display unit (`h`=hours, `d`=days, `dh`=days+hours, `auto`=auto) |
 | `digits`          | `*_reset`  | number                      | `1`        | Decimal places (e.g. `digits:2` → `2.50h`)                       |
@@ -135,8 +134,8 @@ export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {7d_pct} {model}"
 # Custom colors and thresholds
 export CLAUDE_NANO_LINE_FORMAT="{text:[5h]|color:cyan} {5h_pct|warn-threshold:70,alert-threshold:90} {model}"
 
-# Two decimal places + reset time in hours with 2 decimal places
-export CLAUDE_NANO_LINE_FORMAT="{5h_pct|format:pct2} {text:(}{5h_reset|unit:h,digits:2}{text:)} {model}"
+# Usage + reset time in hours with 2 decimal places
+export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {text:(}{5h_reset|unit:h,digits:2}{text:)} {model}"
 
 # Reset time as days+hours with no decimals
 export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {text:(}{5h_reset|unit:dh,digits:0}{text:)} {7d_pct} {model}"

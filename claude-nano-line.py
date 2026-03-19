@@ -81,6 +81,44 @@ COLOR_MAP = {
     "bold_yellow": "\033[1;33m",
 }
 
+THEMES = {
+    "classic": (
+        "{text:[ctx]|color:gray} {ctx_pct} "
+        "{text:[5h]|color:gray} {5h_pct} {text:(|color:light_gray}{5h_reset|color:light_gray}{text:)|color:light_gray} "
+        "{text:[7d]|color:gray} {7d_pct} {text:(|color:light_gray}{7d_reset|color:light_gray}{text:)|color:light_gray} "
+        "{model} {cwd|color:bold_yellow}{text: (|color:cyan}{branch_dirty|color:cyan}{text:)|color:cyan}"
+    ),
+    "minimal": ("{ctx_pct|color:cyan} {5h_pct} {model|color:light_gray} {cwd_short|color:gray}"),
+    "ocean": (
+        "{text:ctx |color:sky_blue}{ctx_pct|color:sky_blue,warn-color:yellow,alert-color:red} "
+        "{text:5h |color:cyan}{5h_pct|color:cyan,warn-color:yellow,alert-color:red} "
+        "{text:7d |color:blue}{7d_pct|color:blue,warn-color:yellow,alert-color:red} "
+        "{model|haiku-color:cyan,sonnet-color:sky_blue,opus-color:blue} "
+        "{cwd|color:sky_blue} {branch_dirty|color:cyan}"
+    ),
+    "forest": (
+        "{ctx_pct|color:green,warn-color:yellow,alert-color:red} "
+        "{text:5h|color:green} {5h_pct|color:green,warn-color:yellow,alert-color:red} "
+        "{text:7d|color:green} {7d_pct|color:green,warn-color:yellow,alert-color:red} "
+        "{model|haiku-color:green,sonnet-color:cyan,opus-color:magenta} "
+        "{cwd|color:green} {branch_dirty|color:cyan,dirty-color:yellow}"
+    ),
+    "sunset": (
+        "{ctx_pct|color:amber,warn-color:yellow,alert-color:red} "
+        "{text:5h|color:amber} {5h_pct|color:amber,warn-color:yellow,alert-color:red} "
+        "{text:7d|color:amber} {7d_pct|color:amber,warn-color:yellow,alert-color:red} "
+        "{model|haiku-color:amber,sonnet-color:pink,opus-color:magenta} "
+        "{cwd|color:amber} {branch_dirty|color:pink,dirty-color:red}"
+    ),
+    "nerd": (
+        "{ctx_pct} {ctx_used_tokens}/{ctx_total_tokens} "
+        "{text:5h|color:gray} {5h_pct} {5h_reset|color:light_gray} "
+        "{text:7d|color:gray} {7d_pct} {7d_reset|color:light_gray} "
+        "{model|haiku-color:amber,sonnet-color:sky_blue,opus-color:pink} "
+        "{cwd_short|color:bold_yellow} {branch_dirty|color:cyan,dirty-color:red}"
+    ),
+}
+
 
 # ── Git branch ──────────────────────────────────────────────────────────────────
 def get_git_branch(cwd):
@@ -743,6 +781,10 @@ def main():
     usage = get_usage_data()
 
     fmt = os.environ.get("CLAUDE_NANO_LINE_FORMAT", "")
+    if not fmt:
+        theme_name = os.environ.get("CLAUDE_NANO_LINE_THEME", "")
+        if theme_name:
+            fmt = THEMES.get(theme_name, "")
     if fmt:
         output = render_custom(fmt, ctx_remaining, usage, model, cwd_real, git_branch, git_dirty)
     else:

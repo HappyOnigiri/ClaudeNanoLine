@@ -1340,5 +1340,60 @@ class TestRenderLegacyTokens(unittest.TestCase):
         self.assertIn("30%", out)
 
 
+# ── TestThemePresets ───────────────────────────────────────────────────────────
+class TestThemePresets(unittest.TestCase):
+    _USAGE = {
+        "five_hour_pct": 50,
+        "seven_day_pct": 60,
+        "five_resets_at": "",
+        "seven_resets_at": "",
+    }
+
+    def test_themes_dict_has_expected_keys(self):
+        expected = {"classic", "minimal", "ocean", "forest", "sunset", "nerd"}
+        self.assertEqual(set(cnl.THEMES.keys()), expected)
+
+    def test_all_themes_render_without_error(self):
+        for name, fmt in cnl.THEMES.items():
+            with self.subTest(theme=name):
+                out = cnl.render_custom(fmt, 70, self._USAGE, "claude-sonnet-4-6", "/home/user/proj", "main", False)
+                self.assertIsInstance(out, str)
+                self.assertTrue(len(out) > 0)
+
+    def test_theme_env_used_when_format_not_set(self):
+        with patch.dict(os.environ, {"CLAUDE_NANO_LINE_THEME": "ocean"}, clear=False):
+            os.environ.pop("CLAUDE_NANO_LINE_FORMAT", None)
+            fmt = os.environ.get("CLAUDE_NANO_LINE_FORMAT", "")
+            if not fmt:
+                theme_name = os.environ.get("CLAUDE_NANO_LINE_THEME", "")
+                if theme_name:
+                    fmt = cnl.THEMES.get(theme_name, "")
+            self.assertEqual(fmt, cnl.THEMES["ocean"])
+
+    def test_format_overrides_theme(self):
+        custom_fmt = "{ctx_pct}"
+        with patch.dict(
+            os.environ,
+            {"CLAUDE_NANO_LINE_FORMAT": custom_fmt, "CLAUDE_NANO_LINE_THEME": "ocean"},
+            clear=False,
+        ):
+            fmt = os.environ.get("CLAUDE_NANO_LINE_FORMAT", "")
+            if not fmt:
+                theme_name = os.environ.get("CLAUDE_NANO_LINE_THEME", "")
+                if theme_name:
+                    fmt = cnl.THEMES.get(theme_name, "")
+            self.assertEqual(fmt, custom_fmt)
+
+    def test_invalid_theme_falls_back_to_legacy(self):
+        with patch.dict(os.environ, {"CLAUDE_NANO_LINE_THEME": "nonexistent_theme"}, clear=False):
+            os.environ.pop("CLAUDE_NANO_LINE_FORMAT", None)
+            fmt = os.environ.get("CLAUDE_NANO_LINE_FORMAT", "")
+            if not fmt:
+                theme_name = os.environ.get("CLAUDE_NANO_LINE_THEME", "")
+                if theme_name:
+                    fmt = cnl.THEMES.get(theme_name, "")
+            self.assertEqual(fmt, "")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

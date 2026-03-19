@@ -79,6 +79,29 @@ Bash or WSL shell.
 
 ## Customization
 
+### Theme presets
+
+Set `CLAUDE_NANO_LINE_THEME` to use a built-in theme without writing a format
+string:
+
+```sh
+export CLAUDE_NANO_LINE_THEME=ocean
+```
+
+| Theme     | Description                                          |
+| --------- | ---------------------------------------------------- |
+| `classic` | Reproduces the legacy default layout                 |
+| `minimal` | Minimal: ctx%, 5h%, model, path                      |
+| `ocean`   | Blue/cyan palette                                    |
+| `forest`  | Green palette                                        |
+| `sunset`  | Warm amber/pink palette                              |
+| `nerd`    | Maximum density: token counts + reset times included |
+
+`CLAUDE_NANO_LINE_FORMAT` takes priority over `CLAUDE_NANO_LINE_THEME`. An
+unknown theme name silently falls back to the legacy layout.
+
+### Custom format
+
 Set the `CLAUDE_NANO_LINE_FORMAT` environment variable to customize the status
 line output. If not set, the default layout is used.
 

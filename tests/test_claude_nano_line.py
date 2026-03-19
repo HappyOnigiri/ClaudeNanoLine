@@ -1320,24 +1320,14 @@ class TestRenderLegacyTokens(unittest.TestCase):
         }
 
     def test_ctx_shows_token_info(self):
-        out = strip_ansi(
-            cnl.render_legacy(70, self._usage(), "claude-sonnet-4-6", "proj", "", model_name="claude-sonnet-4-6")
-        )
-        self.assertIn("[ctx]", out)
-        self.assertIn("30%", out)
-        self.assertIn("k/", out)
-
-    def test_no_ctx_no_token_info(self):
-        out = strip_ansi(
-            cnl.render_legacy(None, self._usage(), "claude-sonnet-4-6", "proj", "", model_name="claude-sonnet-4-6")
-        )
-        self.assertNotIn("[ctx]", out)
-
-    def test_backward_compat_no_model_name(self):
-        # model_name 未指定でもクラッシュしない
         out = strip_ansi(cnl.render_legacy(70, self._usage(), "claude-sonnet-4-6", "proj", ""))
         self.assertIn("[ctx]", out)
         self.assertIn("30%", out)
+        self.assertNotIn("k/", out)
+
+    def test_no_ctx_no_token_info(self):
+        out = strip_ansi(cnl.render_legacy(None, self._usage(), "claude-sonnet-4-6", "proj", ""))
+        self.assertNotIn("[ctx]", out)
 
 
 # ── TestThemePresets ───────────────────────────────────────────────────────────

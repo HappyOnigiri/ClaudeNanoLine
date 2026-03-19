@@ -481,7 +481,7 @@ def estimate_tokens(model_name, ctx_remaining_pct):
 
 
 # ── Legacy rendering ────────────────────────────────────────────────────────────
-def render_legacy(ctx_remaining, usage, model, cwd_base, git_branch, git_dirty=False, model_name=""):
+def render_legacy(ctx_remaining, usage, model, cwd_base, git_branch, git_dirty=False):
     warn_pct = DEFAULT_WARN_PCT
     crit_pct = DEFAULT_CRIT_PCT
     api_error = usage.get("api_error", "")
@@ -490,11 +490,7 @@ def render_legacy(ctx_remaining, usage, model, cwd_base, git_branch, git_dirty=F
     ctx_part = ""
     if ctx_remaining is not None:
         ctx_used = 100 - int(ctx_remaining)
-        used, total = estimate_tokens(model_name or model, ctx_remaining)
-        if used is not None:
-            ctx_pct_str = str(ctx_used) + "% " + fmt_tokens(used) + "/" + fmt_tokens(total)
-        else:
-            ctx_pct_str = str(ctx_used) + "%"
+        ctx_pct_str = str(ctx_used) + "%"
         ctx_part = (
             colorize("[ctx]", COLOR_MAP["gray"]) + " " + usage_color(ctx_used, warn_pct, crit_pct) + ctx_pct_str + RESET
         )
@@ -792,7 +788,7 @@ def main():
         cwd_base = Path(cwd_real).name if cwd_real else ""
         if not cwd_base:
             cwd_base = cwd_short
-        output = render_legacy(ctx_remaining, usage, model, cwd_base, git_branch, git_dirty, model_name=model)
+        output = render_legacy(ctx_remaining, usage, model, cwd_base, git_branch, git_dirty)
 
     sys.stdout.write(output)
     sys.stdout.flush()

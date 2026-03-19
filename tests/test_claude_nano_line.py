@@ -1217,5 +1217,128 @@ class TestResetAtResolve(unittest.TestCase):
         self.assertEqual(result, "")
 
 
+# ── Feature 5: fmt_tokens ──────────────────────────────────────────────────────
+class TestFmtTokens(unittest.TestCase):
+    def test_none_returns_dash(self):
+        self.assertEqual(cnl.fmt_tokens(None), "--")
+
+    def test_millions(self):
+        self.assertEqual(cnl.fmt_tokens(1_200_000), "1.2M")
+
+    def test_thousands(self):
+        self.assertEqual(cnl.fmt_tokens(150_000), "150k")
+
+    def test_small(self):
+        self.assertEqual(cnl.fmt_tokens(800), "800")
+
+    def test_zero(self):
+        self.assertEqual(cnl.fmt_tokens(0), "0")
+
+    def test_exactly_1m(self):
+        self.assertEqual(cnl.fmt_tokens(1_000_000), "1.0M")
+
+    def test_exactly_1k(self):
+        self.assertEqual(cnl.fmt_tokens(1_000), "1k")
+
+
+# ── Feature 5: estimate_tokens ─────────────────────────────────────────────────
+class TestEstimateTokens(unittest.TestCase):
+    def test_sonnet(self):
+        used, total = cnl.estimate_tokens("claude-sonnet-4-6", 70)
+        self.assertEqual(total, 200_000)
+        self.assertEqual(used, 60_000)
+
+    def test_opus(self):
+        used, total = cnl.estimate_tokens("claude-opus-4-6", 85)
+        self.assertEqual(total, 200_000)
+        self.assertEqual(used, 30_000)
+
+    def test_opus_1m(self):
+        used, total = cnl.estimate_tokens("Opus 4.6 (1M context)", 85)
+        self.assertEqual(total, 1_000_000)
+        self.assertEqual(used, 150_000)
+
+    def test_unknown_model_uses_default(self):
+        used, total = cnl.estimate_tokens("unknown-model", 50)
+        self.assertEqual(total, cnl.DEFAULT_CONTEXT_SIZE)
+        self.assertEqual(used, cnl.DEFAULT_CONTEXT_SIZE // 2)
+
+    def test_none_remaining_returns_none(self):
+        used, total = cnl.estimate_tokens("claude-sonnet-4-6", None)
+        self.assertIsNone(used)
+        self.assertIsNone(total)
+
+
+# ── Feature 5: render_custom token placeholders ────────────────────────────────
+class TestRenderCustomTokens(unittest.TestCase):
+    _USAGE = {
+        "five_hour_pct": 50,
+        "seven_day_pct": 50,
+        "five_resets_at": "",
+        "seven_resets_at": "",
+    }
+
+    def _render(self, fmt, ctx=None, model="claude-sonnet-4-6"):
+        return cnl.render_custom(fmt, ctx, self._USAGE, model, "/home/user/project", "main")
+
+    def test_ctx_used_tokens(self):
+        out = strip_ansi(self._render("{ctx_used_tokens}", ctx=70))
+        self.assertEqual(out, "60k")
+
+    def test_ctx_tokens_remaining(self):
+        out = strip_ansi(self._render("{ctx_tokens}", ctx=70))
+        self.assertEqual(out, "140k")
+
+    def test_ctx_total_tokens(self):
+        out = strip_ansi(self._render("{ctx_total_tokens}", ctx=70))
+        self.assertEqual(out, "200k")
+
+    def test_ctx_remaining_none_returns_dash(self):
+        out = strip_ansi(self._render("{ctx_used_tokens}", ctx=None))
+        self.assertEqual(out, "--")
+
+    def test_threshold_color_applied(self):
+        # ctx=5 (95% used) should trigger alert color
+        out = self._render("{ctx_used_tokens}", ctx=5)
+        self.assertIn(cnl.COLOR_MAP["red"], out)
+
+    def test_combined_format(self):
+        out = strip_ansi(self._render("{ctx_pct} {ctx_used_tokens}/{ctx_total_tokens}", ctx=70))
+        self.assertIn("30%", out)
+        self.assertIn("60k", out)
+        self.assertIn("200k", out)
+
+
+# ── Feature 5: render_legacy token info ────────────────────────────────────────
+class TestRenderLegacyTokens(unittest.TestCase):
+    def _usage(self):
+        return {
+            "five_hour_pct": 50,
+            "seven_day_pct": 60,
+            "five_resets_at": "",
+            "seven_resets_at": "",
+        }
+
+    def test_ctx_shows_token_info(self):
+        out = strip_ansi(
+            cnl.render_legacy(70, self._usage(), "claude-sonnet-4-6", "proj", "", model_name="claude-sonnet-4-6")
+        )
+        self.assertIn("[ctx]", out)
+        self.assertIn("30%", out)
+        self.assertIn("k/", out)
+
+    def test_no_ctx_no_token_info(self):
+        out = strip_ansi(
+            cnl.render_legacy(None, self._usage(), "claude-sonnet-4-6", "proj", "", model_name="claude-sonnet-4-6")
+        )
+        self.assertNotIn("[ctx]", out)
+
+    def test_backward_compat_no_model_name(self):
+        # model_name 未指定でもクラッシュしない
+        out = strip_ansi(cnl.render_legacy(70, self._usage(), "claude-sonnet-4-6", "proj", ""))
+        self.assertIn("[ctx]", out)
+        self.assertIn("30%", out)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

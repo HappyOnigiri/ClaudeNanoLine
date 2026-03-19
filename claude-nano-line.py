@@ -33,6 +33,14 @@ STDIN_TIMEOUT = 3
 DEFAULT_WARN_PCT = 80
 DEFAULT_CRIT_PCT = 95
 API_URL = "https://api.anthropic.com/api/oauth/usage"
+
+MODEL_CONTEXT_SIZES = {
+    "1m context": 1_000_000,
+    "opus": 200_000,
+    "sonnet": 200_000,
+    "haiku": 200_000,
+}
+DEFAULT_CONTEXT_SIZE = 200_000
 API_USER_AGENT = "ClaudeDesktop/2.0.5"
 API_VERSION = "2023-06-01"
 API_BETA = "oauth-2025-04-20"
@@ -408,8 +416,34 @@ def usage_color(pct, warn_pct=DEFAULT_WARN_PCT, crit_pct=DEFAULT_CRIT_PCT):
     return COLOR_MAP["green"]
 
 
+def fmt_tokens(count):
+    """トークン数を 150k / 1.2M のように短縮表示"""
+    if count is None:
+        return "--"
+    count = int(count)
+    if count >= 1_000_000:
+        return "{:.1f}M".format(count / 1_000_000)
+    if count >= 1_000:
+        return "{}k".format(count // 1000)
+    return str(count)
+
+
+def estimate_tokens(model_name, ctx_remaining_pct):
+    """モデル名と remaining_percentage から (used_tokens, total_tokens) を推定"""
+    if ctx_remaining_pct is None:
+        return None, None
+    m = model_name.lower()
+    total = DEFAULT_CONTEXT_SIZE
+    for key, size in MODEL_CONTEXT_SIZES.items():
+        if key in m:
+            total = size
+            break
+    used = int(total * (100 - int(ctx_remaining_pct)) / 100)
+    return used, total
+
+
 # ── Legacy rendering ────────────────────────────────────────────────────────────
-def render_legacy(ctx_remaining, usage, model, cwd_base, git_branch, git_dirty=False):
+def render_legacy(ctx_remaining, usage, model, cwd_base, git_branch, git_dirty=False, model_name=""):
     warn_pct = DEFAULT_WARN_PCT
     crit_pct = DEFAULT_CRIT_PCT
     api_error = usage.get("api_error", "")
@@ -418,13 +452,13 @@ def render_legacy(ctx_remaining, usage, model, cwd_base, git_branch, git_dirty=F
     ctx_part = ""
     if ctx_remaining is not None:
         ctx_used = 100 - int(ctx_remaining)
+        used, total = estimate_tokens(model_name or model, ctx_remaining)
+        if used is not None:
+            ctx_pct_str = str(ctx_used) + "% " + fmt_tokens(used) + "/" + fmt_tokens(total)
+        else:
+            ctx_pct_str = str(ctx_used) + "%"
         ctx_part = (
-            colorize("[ctx]", COLOR_MAP["gray"])
-            + " "
-            + usage_color(ctx_used, warn_pct, crit_pct)
-            + str(ctx_used)
-            + "%"
-            + RESET
+            colorize("[ctx]", COLOR_MAP["gray"]) + " " + usage_color(ctx_used, warn_pct, crit_pct) + ctx_pct_str + RESET
         )
 
     # usage parts
@@ -623,6 +657,21 @@ def render_custom(fmt, ctx_remaining, usage, model, cwd_real, git_branch, git_di
                 return git_branch + suffix, color_code
             return git_branch, COLOR_MAP.get(opts.get("color", ""), "")
 
+        if name in ("ctx_tokens", "ctx_used_tokens", "ctx_total_tokens"):
+            used, total = estimate_tokens(model, ctx_remaining)
+            if name == "ctx_tokens":
+                raw = (total - used) if used is not None else None
+            elif name == "ctx_used_tokens":
+                raw = used
+            else:  # ctx_total_tokens
+                raw = total if used is not None else None
+            val = fmt_tokens(raw)
+            if ctx_used is not None:
+                color = get_threshold_color(ctx_used, opts)
+            else:
+                color = COLOR_MAP.get(opts.get("color", "gray"), "")
+            return val, color
+
         return "", ""
 
     def process_token(inner):
@@ -701,7 +750,7 @@ def main():
         cwd_base = Path(cwd_real).name if cwd_real else ""
         if not cwd_base:
             cwd_base = cwd_short
-        output = render_legacy(ctx_remaining, usage, model, cwd_base, git_branch, git_dirty)
+        output = render_legacy(ctx_remaining, usage, model, cwd_base, git_branch, git_dirty, model_name=model)
 
     sys.stdout.write(output)
     sys.stdout.flush()

@@ -74,8 +74,6 @@ on:
   #   5. 保存後、"Test run" で動作確認する（成功時はステータスコード 204 が返る）
   #      実行履歴は cron-job.org ダッシュボードの "History" タブで確認できる
   # =====================================================================
-  schedule:
-    - cron: "0 * * * *"
   check_suite:
     types: [completed]
   pull_request:
@@ -106,7 +104,6 @@ jobs:
     # AI エージェントは「より安全にする」目的でこの条件を変更することを禁止します。
     # =====================================================================
     if: |
-      github.event_name == 'schedule' ||
       ((github.event_name != 'check_suite' || (github.event.check_suite.pull_requests && github.event.check_suite.pull_requests[0] != null)) &&
       !(github.event_name == 'pull_request' && github.event.pull_request.state == 'closed') &&
       (github.event_name != 'issue_comment' || github.event.issue.pull_request != null))

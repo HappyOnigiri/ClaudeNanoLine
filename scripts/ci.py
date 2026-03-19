@@ -15,11 +15,10 @@ COLOR_RESET = "\033[0m"
 TASKS: list[tuple[str, str]] = [
     ("ruff-format", "ruff format claude-nano-line.py tests/"),
     ("ruff-check", "ruff check claude-nano-line.py tests/ --fix"),
-    ("mdformat", "mdformat --wrap 80 $(ls *.md | grep -v CHANGELOG.md)"),
     ("unittest", f"{sys.executable} -m unittest discover -v tests/"),
 ]
 
-MUTATING_TASK_NAMES = {"ruff-format", "ruff-check", "mdformat"}
+MUTATING_TASK_NAMES = {"ruff-format", "ruff-check"}
 
 
 def run_task(name: str, command: str) -> tuple[bool, str, str]:

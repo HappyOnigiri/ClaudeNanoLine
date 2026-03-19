@@ -1,4 +1,4 @@
-.PHONY: ci install repomix clean lint
+.PHONY: ci install repomix clean lint setup
 
 VENV := .venv
 VENV_SENTINEL := $(VENV)/.installed
@@ -34,6 +34,9 @@ $(VENV_SENTINEL): requirements-dev.txt
 	python3 -m venv $(VENV)
 	$(VENV)/bin/pip install -r requirements-dev.txt -q
 	touch $(VENV_SENTINEL)
+
+setup: $(VENV_SENTINEL)
+	@echo "setup: development environment is ready"
 
 ci: $(VENV_SENTINEL)
 	PATH="$(CURDIR)/$(VENV)/bin:$(PATH)" python3 scripts/ci.py

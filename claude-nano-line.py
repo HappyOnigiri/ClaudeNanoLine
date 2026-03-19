@@ -670,13 +670,8 @@ def main():
             cwd_base = cwd_short
         output = render_legacy(ctx_remaining, usage, model, cwd_base, git_branch)
 
-    buf = getattr(sys.stdout, "buffer", None)
-    if buf is not None:
-        buf.write(output.encode())
-        buf.flush()
-    else:
-        sys.stdout.write(output)
-        sys.stdout.flush()
+    sys.stdout.write(output)
+    sys.stdout.flush()
 
 
 if __name__ == "__main__":

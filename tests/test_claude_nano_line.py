@@ -348,6 +348,15 @@ class TestRenderLegacy(unittest.TestCase):
         out = strip_ansi(cnl.render_legacy(None, self._usage(api_error="timeout"), "sonnet", "proj", ""))
         self.assertNotIn("[7d]", out)
 
+    def test_dirty_shows_asterisk(self):
+        out = strip_ansi(cnl.render_legacy(None, self._usage(), "sonnet", "proj", "main", git_dirty=True))
+        self.assertIn("(main*)", out)
+
+    def test_clean_no_asterisk(self):
+        out = strip_ansi(cnl.render_legacy(None, self._usage(), "sonnet", "proj", "main", git_dirty=False))
+        self.assertIn("(main)", out)
+        self.assertNotIn("(main*)", out)
+
 
 # ── 9. TestRenderCustom ────────────────────────────────────────────────────────
 class TestRenderCustom(unittest.TestCase):
@@ -361,10 +370,10 @@ class TestRenderCustom(unittest.TestCase):
             "seven_resets_at": seven_resets,
         }
 
-    def _render(self, fmt, ctx=None, usage=None, model="sonnet", cwd="/home/user/project", branch="main"):
+    def _render(self, fmt, ctx=None, usage=None, model="sonnet", cwd="/home/user/project", branch="main", dirty=False):
         if usage is None:
             usage = self._usage()
-        return cnl.render_custom(fmt, ctx, usage, model, cwd, branch)
+        return cnl.render_custom(fmt, ctx, usage, model, cwd, branch, dirty)
 
     def test_5h_pct(self):
         out = strip_ansi(self._render("{5h_pct}"))
@@ -465,6 +474,40 @@ class TestRenderCustom(unittest.TestCase):
         out = strip_ansi(self._render("{ctx_pct}", ctx=70, usage=self._usage(api_error="timeout")))
         self.assertEqual(out, "30%")
 
+    def test_branch_dirty_when_dirty(self):
+        out = strip_ansi(self._render("{branch_dirty}", branch="main", dirty=True))
+        self.assertEqual(out, "main*")
+
+    def test_branch_dirty_when_clean(self):
+        out = strip_ansi(self._render("{branch_dirty}", branch="main", dirty=False))
+        self.assertEqual(out, "main")
+
+    def test_branch_dirty_custom_suffix(self):
+        out = strip_ansi(self._render("{branch_dirty|dirty-suffix:!}", branch="main", dirty=True))
+        self.assertEqual(out, "main!")
+
+    def test_branch_dirty_color_switch(self):
+        out_dirty = self._render("{branch_dirty|color:cyan,dirty-color:red}", branch="main", dirty=True)
+        self.assertIn(cnl.COLOR_MAP["red"], out_dirty)
+        self.assertNotIn(cnl.COLOR_MAP["cyan"], out_dirty)
+
+        out_clean = self._render("{branch_dirty|color:cyan,dirty-color:red}", branch="main", dirty=False)
+        self.assertIn(cnl.COLOR_MAP["cyan"], out_clean)
+        self.assertNotIn(cnl.COLOR_MAP["red"], out_clean)
+
+    def test_branch_optin_dirty_suffix(self):
+        out = strip_ansi(self._render("{branch|dirty-suffix:*}", branch="main", dirty=True))
+        self.assertEqual(out, "main*")
+
+    def test_branch_optin_no_suffix_when_clean(self):
+        out = strip_ansi(self._render("{branch|dirty-suffix:*}", branch="main", dirty=False))
+        self.assertEqual(out, "main")
+
+    def test_branch_no_dirty_suffix_by_default(self):
+        # {branch} は dirty-suffix 指定なしでは dirty でも * が付かない
+        out = strip_ansi(self._render("{branch}", branch="main", dirty=True))
+        self.assertEqual(out, "main")
+
     def test_unknown_placeholder(self):
         out = strip_ansi(self._render("{unknown_token}"))
         self.assertEqual(out, "")
@@ -513,6 +556,47 @@ class TestGetGitBranch(unittest.TestCase):
         with patch.object(cnl.subprocess, "run") as mock_run:
             result = cnl.get_git_branch(None)
             self.assertEqual(result, "")
+            mock_run.assert_not_called()
+
+
+# ── 10b. TestGetGitDirty ──────────────────────────────────────────────────────
+class TestGetGitDirty(unittest.TestCase):
+    def _mock_run(self, returncode, stdout=""):
+        r = MagicMock()
+        r.returncode = returncode
+        r.stdout = stdout
+        return r
+
+    def test_dirty(self):
+        with patch.object(cnl.subprocess, "run", return_value=self._mock_run(0, " M file.py\n")):
+            self.assertTrue(cnl.get_git_dirty("/some/path"))
+
+    def test_clean(self):
+        with patch.object(cnl.subprocess, "run", return_value=self._mock_run(0, "")):
+            self.assertFalse(cnl.get_git_dirty("/some/path"))
+
+    def test_git_failure(self):
+        with patch.object(cnl.subprocess, "run", return_value=self._mock_run(1)):
+            self.assertFalse(cnl.get_git_dirty("/some/path"))
+
+    def test_exception(self):
+        with patch.object(cnl.subprocess, "run", side_effect=Exception("oops")):
+            self.assertFalse(cnl.get_git_dirty("/some/path"))
+
+    def test_timeout(self):
+        import subprocess
+
+        with patch.object(cnl.subprocess, "run", side_effect=subprocess.TimeoutExpired(["git"], 3)):
+            self.assertFalse(cnl.get_git_dirty("/some/path"))
+
+    def test_empty_cwd(self):
+        with patch.object(cnl.subprocess, "run") as mock_run:
+            self.assertFalse(cnl.get_git_dirty(""))
+            mock_run.assert_not_called()
+
+    def test_none_cwd(self):
+        with patch.object(cnl.subprocess, "run") as mock_run:
+            self.assertFalse(cnl.get_git_dirty(None))
             mock_run.assert_not_called()
 
 
@@ -770,22 +854,23 @@ class TestMainIntegration(unittest.TestCase):
         with patch("sys.stdin", io.StringIO(stdin_json)):
             with patch.object(cnl, "get_usage_data", return_value=self._USAGE):
                 with patch.object(cnl, "get_git_branch", return_value="main"):
-                    env_patch = {}
-                    if env:
-                        env_patch = env
-                    with patch.dict(os.environ, env_patch, clear=False):
-                        # CLAUDE_NANO_LINE_FORMAT をクリアする場合
-                        if "CLAUDE_NANO_LINE_FORMAT" not in env_patch:
-                            with patch.dict(os.environ, {"CLAUDE_NANO_LINE_FORMAT": ""}, clear=False):
+                    with patch.object(cnl, "get_git_dirty", return_value=False):
+                        env_patch = {}
+                        if env:
+                            env_patch = env
+                        with patch.dict(os.environ, env_patch, clear=False):
+                            # CLAUDE_NANO_LINE_FORMAT をクリアする場合
+                            if "CLAUDE_NANO_LINE_FORMAT" not in env_patch:
+                                with patch.dict(os.environ, {"CLAUDE_NANO_LINE_FORMAT": ""}, clear=False):
+                                    captured = io.StringIO()
+                                    with patch("sys.stdout", captured):
+                                        cnl.main()
+                                    return captured.getvalue()
+                            else:
                                 captured = io.StringIO()
                                 with patch("sys.stdout", captured):
                                     cnl.main()
                                 return captured.getvalue()
-                        else:
-                            captured = io.StringIO()
-                            with patch("sys.stdout", captured):
-                                cnl.main()
-                            return captured.getvalue()
 
     def test_legacy_mode(self):
         input_data = {
@@ -813,12 +898,13 @@ class TestMainIntegration(unittest.TestCase):
         with patch("sys.stdin", io.StringIO("not valid json{")):
             with patch.object(cnl, "get_usage_data", return_value=self._USAGE):
                 with patch.object(cnl, "get_git_branch", return_value=""):
-                    with patch.dict(os.environ, {"CLAUDE_NANO_LINE_FORMAT": ""}, clear=False):
-                        captured = io.StringIO()
-                        with patch("sys.stdout", captured):
-                            # クラッシュしないことを確認
-                            cnl.main()
-                        out = captured.getvalue()
+                    with patch.object(cnl, "get_git_dirty", return_value=False):
+                        with patch.dict(os.environ, {"CLAUDE_NANO_LINE_FORMAT": ""}, clear=False):
+                            captured = io.StringIO()
+                            with patch("sys.stdout", captured):
+                                # クラッシュしないことを確認
+                                cnl.main()
+                            out = captured.getvalue()
         # 何らかの出力があること（空でない）
         self.assertIsInstance(out, str)
 
@@ -828,11 +914,12 @@ class TestMainIntegration(unittest.TestCase):
         with patch("sys.stdin", io.StringIO("")):
             with patch.object(cnl, "get_usage_data", return_value=self._USAGE):
                 with patch.object(cnl, "get_git_branch", return_value=""):
-                    with patch.dict(os.environ, {"CLAUDE_NANO_LINE_FORMAT": ""}, clear=False):
-                        captured = io.StringIO()
-                        with patch("sys.stdout", captured):
-                            cnl.main()
-                        out = captured.getvalue()
+                    with patch.object(cnl, "get_git_dirty", return_value=False):
+                        with patch.dict(os.environ, {"CLAUDE_NANO_LINE_FORMAT": ""}, clear=False):
+                            captured = io.StringIO()
+                            with patch("sys.stdout", captured):
+                                cnl.main()
+                            out = captured.getvalue()
         self.assertIsInstance(out, str)
 
 

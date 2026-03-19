@@ -92,6 +92,24 @@ def get_git_branch(cwd):
     return ""
 
 
+# ── Git dirty ───────────────────────────────────────────────────────────────────
+def get_git_dirty(cwd):
+    if not cwd:
+        return False
+    try:
+        result = subprocess.run(
+            ["git", "-C", cwd, "status", "--porcelain", "--untracked-files=no"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        if result.returncode == 0:
+            return bool(result.stdout.strip())
+    except Exception:
+        pass
+    return False
+
+
 # ── OAuth token ─────────────────────────────────────────────────────────────────
 def get_oauth_token():
     """macOS Keychain -> credentials file の順でトークンを取得"""
@@ -391,7 +409,7 @@ def usage_color(pct, warn_pct=DEFAULT_WARN_PCT, crit_pct=DEFAULT_CRIT_PCT):
 
 
 # ── Legacy rendering ────────────────────────────────────────────────────────────
-def render_legacy(ctx_remaining, usage, model, cwd_base, git_branch):
+def render_legacy(ctx_remaining, usage, model, cwd_base, git_branch, git_dirty=False):
     warn_pct = DEFAULT_WARN_PCT
     crit_pct = DEFAULT_CRIT_PCT
     api_error = usage.get("api_error", "")
@@ -448,7 +466,8 @@ def render_legacy(ctx_remaining, usage, model, cwd_base, git_branch):
     model_part = get_model_color(model) + model + RESET
 
     # cwd part
-    git_info = " (" + git_branch + ")" if git_branch else ""
+    dirty_mark = "*" if git_dirty else ""
+    git_info = " (" + git_branch + dirty_mark + ")" if git_branch else ""
     cwd_part = COLOR_MAP["bold"] + COLOR_MAP["yellow"] + cwd_base + RESET + COLOR_MAP["cyan"] + git_info + RESET
 
     # assemble
@@ -489,7 +508,7 @@ def get_threshold_color(pct_val, opts, warn_pct=DEFAULT_WARN_PCT, crit_pct=DEFAU
         return COLOR_MAP.get(c_normal, "")
 
 
-def render_custom(fmt, ctx_remaining, usage, model, cwd_real, git_branch):
+def render_custom(fmt, ctx_remaining, usage, model, cwd_real, git_branch, git_dirty=False):
     api_error = usage.get("api_error", "")
     cwd_short = str(Path(cwd_real)).replace(str(Path.home()), "~") if cwd_real else ""
     cwd_base = Path(cwd_real).name if cwd_real else ""
@@ -589,6 +608,19 @@ def render_custom(fmt, ctx_remaining, usage, model, cwd_real, git_branch):
 
         # branch
         if name == "branch":
+            suffix = opts.get("dirty-suffix", "")
+            if suffix and git_dirty:
+                dc = opts.get("dirty-color", "")
+                color_code = COLOR_MAP.get(dc, "") if dc else COLOR_MAP.get(opts.get("color", ""), "")
+                return git_branch + suffix, color_code
+            return git_branch, COLOR_MAP.get(opts.get("color", ""), "")
+
+        if name == "branch_dirty":
+            suffix = opts.get("dirty-suffix", "*")
+            if git_dirty:
+                dc = opts.get("dirty-color", "")
+                color_code = COLOR_MAP.get(dc, "") if dc else COLOR_MAP.get(opts.get("color", ""), "")
+                return git_branch + suffix, color_code
             return git_branch, COLOR_MAP.get(opts.get("color", ""), "")
 
         return "", ""
@@ -658,17 +690,18 @@ def main():
     ctx_remaining = (input_data.get("context_window") or {}).get("remaining_percentage")
 
     git_branch = get_git_branch(cwd_real)
+    git_dirty = get_git_dirty(cwd_real) if git_branch else False
     usage = get_usage_data()
 
     fmt = os.environ.get("CLAUDE_NANO_LINE_FORMAT", "")
     if fmt:
-        output = render_custom(fmt, ctx_remaining, usage, model, cwd_real, git_branch)
+        output = render_custom(fmt, ctx_remaining, usage, model, cwd_real, git_branch, git_dirty)
     else:
         cwd_short = str(Path(cwd_real)).replace(str(Path.home()), "~") if cwd_real else ""
         cwd_base = Path(cwd_real).name if cwd_real else ""
         if not cwd_base:
             cwd_base = cwd_short
-        output = render_legacy(ctx_remaining, usage, model, cwd_base, git_branch)
+        output = render_legacy(ctx_remaining, usage, model, cwd_base, git_branch, git_dirty)
 
     sys.stdout.write(output)
     sys.stdout.flush()

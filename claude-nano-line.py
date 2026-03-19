@@ -28,7 +28,7 @@ from urllib.request import Request, urlopen
 # ── Configuration ──────────────────────────────────────────────────────────────
 CACHE_TTL = 360
 HTTP_TIMEOUT = 5
-GLOBAL_TIMEOUT = 10
+GLOBAL_TIMEOUT = 20
 STDIN_TIMEOUT = 3
 DEFAULT_WARN_PCT = 80
 DEFAULT_CRIT_PCT = 95

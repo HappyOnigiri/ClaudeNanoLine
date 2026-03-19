@@ -26,25 +26,25 @@ def strip_ansi(s):
 # ── 1. TestToPct ───────────────────────────────────────────────────────────────
 class TestToPct(unittest.TestCase):
     def test_none_returns_negative_one(self):
-        self.assertEqual(cnl.to_pct(None), (-1, -1.0))
+        self.assertEqual(cnl.to_pct(None), -1)
 
     def test_zero(self):
-        self.assertEqual(cnl.to_pct(0), (0, 0.0))
+        self.assertEqual(cnl.to_pct(0), 0)
 
     def test_integer_value(self):
-        self.assertEqual(cnl.to_pct(50), (50, 50.0))
+        self.assertEqual(cnl.to_pct(50), 50)
 
     def test_float_value(self):
-        self.assertEqual(cnl.to_pct(42.7), (42, 42.7))
+        self.assertEqual(cnl.to_pct(42.7), 42)
 
     def test_string_numeric(self):
-        self.assertEqual(cnl.to_pct("75.5"), (75, 75.5))
+        self.assertEqual(cnl.to_pct("75.5"), 75)
 
     def test_cap_at_100(self):
-        self.assertEqual(cnl.to_pct(150), (100, 100.0))
+        self.assertEqual(cnl.to_pct(150), 100)
 
     def test_small_float(self):
-        self.assertEqual(cnl.to_pct(0.5), (0, 0.5))
+        self.assertEqual(cnl.to_pct(0.5), 0)
 
 
 # ── 2. TestFmtResetTime ────────────────────────────────────────────────────────
@@ -266,9 +266,7 @@ class TestRenderLegacy(unittest.TestCase):
             return {"api_error": api_error}
         return {
             "five_hour_pct": five,
-            "five_hour_pct_raw": float(five),
             "seven_day_pct": seven,
-            "seven_day_pct_raw": float(seven),
             "five_resets_at": "",
             "seven_resets_at": "",
         }
@@ -353,14 +351,12 @@ class TestRenderLegacy(unittest.TestCase):
 
 # ── 9. TestRenderCustom ────────────────────────────────────────────────────────
 class TestRenderCustom(unittest.TestCase):
-    def _usage(self, five=42, seven=60, five_raw=42.7, seven_raw=60.0, five_resets="", seven_resets="", api_error=""):
+    def _usage(self, five=42, seven=60, five_resets="", seven_resets="", api_error=""):
         if api_error:
             return {"api_error": api_error}
         return {
             "five_hour_pct": five,
-            "five_hour_pct_raw": five_raw,
             "seven_day_pct": seven,
-            "seven_day_pct_raw": seven_raw,
             "five_resets_at": five_resets,
             "seven_resets_at": seven_resets,
         }
@@ -381,10 +377,6 @@ class TestRenderCustom(unittest.TestCase):
     def test_ctx_pct(self):
         out = strip_ansi(self._render("{ctx_pct}", ctx=70))
         self.assertEqual(out, "30%")
-
-    def test_5h_pct_format_pct1(self):
-        out = strip_ansi(self._render("{5h_pct|format:pct1}"))
-        self.assertEqual(out, "42.7%")
 
     def test_pct_no_data(self):
         out = strip_ansi(self._render("{5h_pct}", usage=self._usage(five=-1)))
@@ -681,8 +673,6 @@ class TestFetchUsage(unittest.TestCase):
             result = cnl.fetch_usage("mytoken")
         self.assertIn("five_hour_pct", result)
         self.assertIn("seven_day_pct", result)
-        self.assertIn("five_hour_pct_raw", result)
-        self.assertIn("seven_day_pct_raw", result)
         self.assertIn("five_resets_at", result)
         self.assertIn("seven_resets_at", result)
         self.assertEqual(result["five_hour_pct"], 42)
@@ -737,7 +727,6 @@ class TestFetchUsage(unittest.TestCase):
             result = cnl.fetch_usage("mytoken")
         self.assertEqual(result["five_hour_pct"], 100)
         self.assertEqual(result["seven_day_pct"], 100)
-        self.assertEqual(result["five_hour_pct_raw"], 100.0)
 
 
 # ── 15. TestGetUsageData ───────────────────────────────────────────────────────
@@ -769,9 +758,7 @@ class TestGetUsageData(unittest.TestCase):
 class TestMainIntegration(unittest.TestCase):
     _USAGE = {
         "five_hour_pct": 42,
-        "five_hour_pct_raw": 42.0,
         "seven_day_pct": 60,
-        "seven_day_pct_raw": 60.0,
         "five_resets_at": "",
         "seven_resets_at": "",
     }
@@ -847,47 +834,6 @@ class TestMainIntegration(unittest.TestCase):
                             cnl.main()
                         out = captured.getvalue()
         self.assertIsInstance(out, str)
-
-
-# ── Feature 1: format:pctN ─────────────────────────────────────────────────────
-class TestPctN(unittest.TestCase):
-    def _usage(self, five=42.73):
-        return {
-            "five_hour_pct": int(five),
-            "five_hour_pct_raw": float(five),
-            "seven_day_pct": -1,
-            "seven_day_pct_raw": -1.0,
-            "five_resets_at": "",
-            "seven_resets_at": "",
-        }
-
-    def _render(self, fmt, usage=None):
-        if usage is None:
-            usage = self._usage()
-        return strip_ansi(cnl.render_custom(fmt, None, usage, "sonnet", "", ""))
-
-    def test_pct0_returns_integer(self):
-        self.assertEqual(self._render("{5h_pct|format:pct0}"), "42%")
-
-    def test_pct1_returns_one_decimal(self):
-        self.assertEqual(self._render("{5h_pct|format:pct1}"), "42.7%")
-
-    def test_pct2_returns_two_decimals(self):
-        self.assertEqual(self._render("{5h_pct|format:pct2}"), "42.73%")
-
-    def test_pct_default_returns_integer(self):
-        self.assertEqual(self._render("{5h_pct}"), "42%")
-
-    def test_pct2_no_raw_falls_back_to_int(self):
-        usage = {
-            "five_hour_pct": 42,
-            "five_hour_pct_raw": -1.0,
-            "seven_day_pct": -1,
-            "seven_day_pct_raw": -1.0,
-            "five_resets_at": "",
-            "seven_resets_at": "",
-        }
-        self.assertEqual(self._render("{5h_pct|format:pct2}", usage=usage), "42%")
 
 
 # ── Feature 2: fmt_reset_time_v2 ───────────────────────────────────────────────
@@ -968,9 +914,7 @@ class TestResetDispatch(unittest.TestCase):
     def _usage(self, secs):
         return {
             "five_hour_pct": 50,
-            "five_hour_pct_raw": 50.0,
             "seven_day_pct": 50,
-            "seven_day_pct_raw": 50.0,
             "five_resets_at": self._iso(secs),
             "seven_resets_at": self._iso(secs),
         }
@@ -1000,9 +944,7 @@ class TestResetDispatch(unittest.TestCase):
 class TestModelPerModelColor(unittest.TestCase):
     _USAGE = {
         "five_hour_pct": 50,
-        "five_hour_pct_raw": 50.0,
         "seven_day_pct": 50,
-        "seven_day_pct_raw": 50.0,
         "five_resets_at": "",
         "seven_resets_at": "",
     }

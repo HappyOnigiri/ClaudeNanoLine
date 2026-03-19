@@ -100,21 +100,24 @@ WSL）のシェルから実行してください。
 
 ### プレースホルダー一覧
 
-| 名前           | 出力例            | 説明                                                                  |
-| -------------- | ----------------- | --------------------------------------------------------------------- |
-| `ctx_pct`      | `73%`             | コンテキスト使用率                                                    |
-| `5h_pct`       | `27%`             | 5 時間枠使用率                                                        |
-| `7d_pct`       | `15%`             | 7 日枠使用率                                                          |
-| `5h_reset`     | `3.4h`            | 5h リセット残り時間                                                   |
-| `7d_reset`     | `6d`              | 7d リセット残り時間                                                   |
-| `5h_reset_at`  | `18:30`           | 5h リセット日時                                                       |
-| `7d_reset_at`  | `3/25 09:00`      | 7d リセット日時                                                       |
-| `model`        | `Sonnet`          | モデル名                                                              |
-| `cwd`          | `myproject`       | ディレクトリ basename                                                 |
-| `cwd_short`    | `~/dev/proj`      | `~` 省略パス                                                          |
-| `cwd_full`     | `/Users/.../proj` | フルパス                                                              |
-| `branch`       | `main`            | Git ブランチ名                                                        |
-| `branch_dirty` | `main*`           | Git ブランチ名（未コミット変更がある場合に `*` などのマーカーを付加） |
+| 名前               | 出力例            | 説明                                                                  |
+| ------------------ | ----------------- | --------------------------------------------------------------------- |
+| `ctx_pct`          | `73%`             | コンテキスト使用率                                                    |
+| `5h_pct`           | `27%`             | 5 時間枠使用率                                                        |
+| `7d_pct`           | `15%`             | 7 日枠使用率                                                          |
+| `5h_reset`         | `3.4h`            | 5h リセット残り時間                                                   |
+| `7d_reset`         | `6d`              | 7d リセット残り時間                                                   |
+| `5h_reset_at`      | `18:30`           | 5h リセット日時                                                       |
+| `7d_reset_at`      | `3/25 09:00`      | 7d リセット日時                                                       |
+| `model`            | `Sonnet`          | モデル名                                                              |
+| `cwd`              | `myproject`       | ディレクトリ basename                                                 |
+| `cwd_short`        | `~/dev/proj`      | `~` 省略パス                                                          |
+| `cwd_full`         | `/Users/.../proj` | フルパス                                                              |
+| `branch`           | `main`            | Git ブランチ名                                                        |
+| `branch_dirty`     | `main*`           | Git ブランチ名（未コミット変更がある場合に `*` などのマーカーを付加） |
+| `ctx_tokens`       | `140k`            | コンテキスト残りトークン数（モデル名から推定）                        |
+| `ctx_used_tokens`  | `60k`             | コンテキスト使用トークン数（モデル名から推定）                        |
+| `ctx_total_tokens` | `200k`            | コンテキスト総トークン数（モデル名から推定）                          |
 
 ### オプション一覧
 
@@ -164,6 +167,9 @@ export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {text:|} {7d_pct} {text:|} {model} {cwd
 
 # デフォルトの見た目を再現
 export CLAUDE_NANO_LINE_FORMAT="{text:[ctx]|color:gray} {ctx_pct} {text:[5h]|color:gray} {5h_pct} {text:(|color:light_gray}{5h_reset}{text:)|color:light_gray} {text:[7d]|color:gray} {7d_pct} {text:(|color:light_gray}{7d_reset}{text:)|color:light_gray} {model} {cwd|color:bold_yellow}{text: (|color:cyan}{branch}{text:)|color:cyan}"
+
+# コンテキストのトークン数表示（モデル名から推定）
+export CLAUDE_NANO_LINE_FORMAT="{ctx_pct} {ctx_used_tokens}/{ctx_total_tokens} {model}"
 
 # Git dirty 表示（未コミット変更があると "main*" と表示）
 export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {model} {cwd} {branch_dirty}"

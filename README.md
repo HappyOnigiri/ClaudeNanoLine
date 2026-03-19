@@ -103,21 +103,24 @@ The format string is composed of tokens in `{type|options}` form.
 
 ### Placeholder reference
 
-| Name           | Example           | Description                                                            |
-| -------------- | ----------------- | ---------------------------------------------------------------------- |
-| `ctx_pct`      | `73%`             | Context window usage                                                   |
-| `5h_pct`       | `27%`             | 5-hour window usage                                                    |
-| `7d_pct`       | `15%`             | 7-day window usage                                                     |
-| `5h_reset`     | `3.4h`            | Time until 5h window reset                                             |
-| `7d_reset`     | `6d`              | Time until 7d window reset                                             |
-| `5h_reset_at`  | `18:30`           | Reset time of 5h window                                                |
-| `7d_reset_at`  | `3/25 09:00`      | Reset time of 7d window                                                |
-| `model`        | `Sonnet`          | Model name                                                             |
-| `cwd`          | `myproject`       | Directory basename                                                     |
-| `cwd_short`    | `~/dev/proj`      | `~`-abbreviated path                                                   |
-| `cwd_full`     | `/Users/.../proj` | Full path                                                              |
-| `branch`       | `main`            | Git branch name                                                        |
-| `branch_dirty` | `main*`           | Git branch name with dirty marker (`*` when uncommitted changes exist) |
+| Name               | Example           | Description                                                            |
+| ------------------ | ----------------- | ---------------------------------------------------------------------- |
+| `ctx_pct`          | `73%`             | Context window usage                                                   |
+| `5h_pct`           | `27%`             | 5-hour window usage                                                    |
+| `7d_pct`           | `15%`             | 7-day window usage                                                     |
+| `5h_reset`         | `3.4h`            | Time until 5h window reset                                             |
+| `7d_reset`         | `6d`              | Time until 7d window reset                                             |
+| `5h_reset_at`      | `18:30`           | Reset time of 5h window                                                |
+| `7d_reset_at`      | `3/25 09:00`      | Reset time of 7d window                                                |
+| `model`            | `Sonnet`          | Model name                                                             |
+| `cwd`              | `myproject`       | Directory basename                                                     |
+| `cwd_short`        | `~/dev/proj`      | `~`-abbreviated path                                                   |
+| `cwd_full`         | `/Users/.../proj` | Full path                                                              |
+| `branch`           | `main`            | Git branch name                                                        |
+| `branch_dirty`     | `main*`           | Git branch name with dirty marker (`*` when uncommitted changes exist) |
+| `ctx_tokens`       | `140k`            | Remaining context tokens (estimated from model)                        |
+| `ctx_used_tokens`  | `60k`             | Used context tokens (estimated from model)                             |
+| `ctx_total_tokens` | `200k`            | Total context tokens (estimated from model)                            |
 
 ### Option reference
 
@@ -176,6 +179,9 @@ export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {5h_reset_at|format:time_tz} {7d_pct} {
 
 # Show in UTC
 export CLAUDE_NANO_LINE_FORMAT="{5h_reset_at|tz:utc,format:auto_tz} {7d_reset_at|tz:utc,format:full}"
+
+# Context token usage (estimated from model name)
+export CLAUDE_NANO_LINE_FORMAT="{ctx_pct} {ctx_used_tokens}/{ctx_total_tokens} {model}"
 
 # Git dirty indicator (shows "main*" when there are uncommitted changes)
 export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {model} {cwd} {branch_dirty}"

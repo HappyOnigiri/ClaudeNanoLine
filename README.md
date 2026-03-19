@@ -31,8 +31,12 @@ API usage is fetched from the Anthropic API using an OAuth token (macOS Keychain
 ### Automatic install (recommended)
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/HappyOnigiri/ClaudeNanoLine/main/setup.sh | bash
+curl -fsSL -o /tmp/claude-nano-line-setup.sh https://raw.githubusercontent.com/HappyOnigiri/ClaudeNanoLine/main/setup.sh
+less /tmp/claude-nano-line-setup.sh   # review the script before running
+bash /tmp/claude-nano-line-setup.sh
 ```
+
+> **Note**: Always review a script before executing it from the internet.
 
 Downloads `~/.claude/claude-nano-line.py` and adds the configuration to `~/.claude/settings.json`. Shows a diff and asks for confirmation before making changes.
 

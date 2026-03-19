@@ -31,8 +31,12 @@ API 使用率は OAuth トークン（macOS はキーチェーン、Windows/Linu
 ### 自動インストール (推奨)
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/HappyOnigiri/ClaudeNanoLine/main/setup.sh | bash
+curl -fsSL -o /tmp/claude-nano-line-setup.sh https://raw.githubusercontent.com/HappyOnigiri/ClaudeNanoLine/main/setup.sh
+less /tmp/claude-nano-line-setup.sh   # 実行前にスクリプトの内容を確認してください
+bash /tmp/claude-nano-line-setup.sh
 ```
+
+> **注意**: インターネットから取得したスクリプトは、実行前に必ず内容を確認してください。
 
 `~/.claude/claude-nano-line.py` のダウンロードと `~/.claude/settings.json` への設定追加を自動で行います。変更前に差分を表示して確認を求めます。
 

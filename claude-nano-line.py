@@ -154,9 +154,8 @@ def write_log(msg):
 # ── API ─────────────────────────────────────────────────────────────────────────
 def to_pct(val):
     if val is None:
-        return -1, -1.0
-    f = float(val)
-    return min(100, int(f)), min(100.0, f)
+        return -1
+    return min(100, int(float(val)))
 
 
 def fetch_usage(token):
@@ -218,16 +217,14 @@ def fetch_usage(token):
 
     five = d.get("five_hour", {})
     seven = d.get("seven_day", {})
-    five_pct, five_pct_raw = to_pct(five.get("utilization"))
-    seven_pct, seven_pct_raw = to_pct(seven.get("utilization"))
+    five_pct = to_pct(five.get("utilization"))
+    seven_pct = to_pct(seven.get("utilization"))
     five_resets_at = five.get("resets_at", "")
     seven_resets_at = seven.get("resets_at", "")
 
     result = {
         "five_hour_pct": five_pct,
-        "five_hour_pct_raw": five_pct_raw,
         "seven_day_pct": seven_pct,
-        "seven_day_pct_raw": seven_pct_raw,
         "five_resets_at": five_resets_at,
         "seven_resets_at": seven_resets_at,
     }
@@ -459,10 +456,8 @@ def render_custom(fmt, ctx_remaining, usage, model, cwd_real, git_branch):
         cwd_base = cwd_short
 
     ctx_used = None
-    ctx_used_raw = None
     if ctx_remaining is not None:
         ctx_used = 100 - int(ctx_remaining)
-        ctx_used_raw = float(ctx_used)
 
     def resolve(name, opts):
         # pct 系
@@ -479,32 +474,16 @@ def render_custom(fmt, ctx_remaining, usage, model, cwd_real, git_branch):
 
             if prefix == "ctx":
                 int_val = ctx_used
-                raw_val = ctx_used_raw
             elif prefix == "5h":
                 int_val = usage.get("five_hour_pct", -1)
-                raw_val = usage.get("five_hour_pct_raw", -1.0)
             else:  # 7d
                 int_val = usage.get("seven_day_pct", -1)
-                raw_val = usage.get("seven_day_pct_raw", -1.0)
 
             if int_val is None or int_val == -1:
                 return "--%", COLOR_MAP.get("gray", "")
 
             pct_int = int(int_val)
-            fmt_type = opts.get("format", "pct")
-            m = re.match(r"^pct(\d+)$", fmt_type)
-            if m:
-                n = int(m.group(1))
-                if n == 0:
-                    val = str(pct_int) + "%"
-                elif raw_val is not None and raw_val != -1.0:
-                    val = f"{float(raw_val):.{n}f}%"
-                else:
-                    val = str(pct_int) + "%"
-            elif fmt_type == "pct":
-                val = str(pct_int) + "%"
-            else:
-                val = str(pct_int) + "%"
+            val = str(pct_int) + "%"
 
             color = get_threshold_color(pct_int, opts)
             return val, color

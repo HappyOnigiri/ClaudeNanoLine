@@ -10,12 +10,13 @@
 
 import json
 import os
+import queue
 import re
-import select
 import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -632,12 +633,19 @@ def main():
         signal.signal(signal.SIGALRM, _timeout_handler)
         signal.alarm(GLOBAL_TIMEOUT)
 
+    _q: queue.Queue[str | None] = queue.Queue()
+
+    def _stdin_reader() -> None:
+        try:
+            _q.put(sys.stdin.read())
+        except Exception:
+            _q.put(None)
+
+    threading.Thread(target=_stdin_reader, daemon=True).start()
     try:
-        ready, _, _ = select.select([sys.stdin], [], [], STDIN_TIMEOUT)
-        raw = sys.stdin.read() if ready else None
-    except (OSError, ValueError):
-        # select not supported (e.g., StringIO in tests, Windows)
-        raw = sys.stdin.read()
+        raw = _q.get(timeout=STDIN_TIMEOUT)
+    except queue.Empty:
+        raw = None
     try:
         input_data = json.loads(raw) if raw else {}
     except Exception:

@@ -1,4 +1,4 @@
-.PHONY: ci install repomix clean lint setup
+.PHONY: ci install repomix clean lint setup demo
 
 VENV := .venv
 VENV_SENTINEL := $(VENV)/.installed
@@ -49,6 +49,9 @@ lint:
 repomix:
 	@mkdir -p tmp/repomix
 	npx --yes repomix@$(REPOMIX_VERSION) --quiet -o tmp/repomix/repomix-core.xml
+
+demo:
+	python3 scripts/demo.py
 
 clean:
 	rm -rf tmp/

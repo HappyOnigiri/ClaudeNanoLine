@@ -17,6 +17,7 @@ import os
 import queue
 import re
 import signal
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -26,6 +27,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
+try:
+    import certifi  # optional; used as CA bundle fallback when Python's default trust store is unusable
+except ImportError:  # pragma: no cover
+    certifi = None
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 CACHE_TTL = 360
@@ -224,6 +230,35 @@ def write_log(msg):
         pass
 
 
+# ── SSL ─────────────────────────────────────────────────────────────────────────
+def _build_ssl_context():
+    """HTTPS 用 SSL コンテキストを構築する。
+
+    既定の CA ストアが壊れている (python.org 版 Python で
+    Install Certificates.command 未実行など) 環境では、
+    certifi が import できればそちらの CA バンドルを読み込む。
+    どちらも無い場合は create_default_context() の結果をそのまま返し、
+    失敗時の URLError を fetch_usage 側でログする。
+    """
+    ctx = ssl.create_default_context()
+
+    # ssl モジュールが参照する既定 CA が実在するか確認
+    paths = ssl.get_default_verify_paths()
+    default_ok = bool(paths.cafile) or (paths.capath and os.path.isdir(paths.capath))
+    if default_ok:
+        return ctx
+
+    if certifi is not None:
+        try:
+            ctx.load_verify_locations(cafile=certifi.where())
+        except Exception:
+            pass
+    return ctx
+
+
+_SSL_CONTEXT = _build_ssl_context()
+
+
 # ── API ─────────────────────────────────────────────────────────────────────────
 def to_pct(val):
     if val is None:
@@ -243,7 +278,7 @@ def fetch_usage(token):
         },
     )
     try:
-        with urlopen(req, timeout=HTTP_TIMEOUT) as resp:
+        with urlopen(req, timeout=HTTP_TIMEOUT, context=_SSL_CONTEXT) as resp:
             raw = resp.read()
     except TimeoutError:
         write_log("error:timeout")
@@ -255,6 +290,10 @@ def fetch_usage(token):
             write_log("error:timeout")
             write_cache({"api_error": "timeout"})
             return {"api_error": "timeout"}
+        if isinstance(reason, ssl.SSLError):
+            write_log("error:ssl reason=" + str(reason))
+            write_cache({"api_error": "unknown"})
+            return {"api_error": "unknown"}
         write_log("error:unknown url_error=" + str(reason))
         write_cache({"api_error": "unknown"})
         return {"api_error": "unknown"}

@@ -7,6 +7,7 @@ import os
 import re
 import tempfile
 import time
+import types
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -821,6 +822,60 @@ class TestFetchUsage(unittest.TestCase):
             result = cnl.fetch_usage("mytoken")
         self.assertEqual(result["five_hour_pct"], 100)
         self.assertEqual(result["seven_day_pct"], 100)
+
+    def test_url_error_ssl_certificate(self):
+        import ssl
+        from urllib.error import URLError
+
+        reason = ssl.SSLError(1, "CERTIFICATE_VERIFY_FAILED certificate verify failed")
+        with patch.object(cnl, "urlopen", side_effect=URLError(reason)):
+            with patch.object(cnl, "write_log") as mock_log:
+                result = cnl.fetch_usage("mytoken")
+        self.assertEqual(result, {"api_error": "unknown"})
+        # SSL 由来であることをログで判別できることを保証
+        logged = " ".join(str(c.args[0]) for c in mock_log.call_args_list)
+        self.assertIn("error:ssl", logged)
+
+
+# ── 14b. TestBuildSSLContext ───────────────────────────────────────────────────
+class TestBuildSSLContext(unittest.TestCase):
+    def test_uses_certifi_when_default_paths_broken(self):
+        import ssl as _ssl
+
+        fake_paths = _ssl.DefaultVerifyPaths(
+            cafile=None,
+            capath=None,
+            openssl_cafile_env="SSL_CERT_FILE",
+            openssl_cafile="/nonexistent/cert.pem",
+            openssl_capath_env="SSL_CERT_DIR",
+            openssl_capath="/nonexistent/certs",
+        )
+        fake_certifi = types.SimpleNamespace(where=lambda: "/tmp/fake-ca.pem")
+        with (
+            patch.object(cnl, "certifi", fake_certifi),
+            patch.object(_ssl, "get_default_verify_paths", return_value=fake_paths),
+        ):
+            ctx = MagicMock()
+            with patch.object(_ssl, "create_default_context", return_value=ctx):
+                cnl._build_ssl_context()
+            ctx.load_verify_locations.assert_called_once_with(cafile="/tmp/fake-ca.pem")
+
+    def test_skips_certifi_when_default_paths_ok(self):
+        import ssl as _ssl
+
+        fake_paths = _ssl.DefaultVerifyPaths(
+            cafile="/etc/ssl/cert.pem",
+            capath=None,
+            openssl_cafile_env="SSL_CERT_FILE",
+            openssl_cafile="/etc/ssl/cert.pem",
+            openssl_capath_env="SSL_CERT_DIR",
+            openssl_capath="/etc/ssl/certs",
+        )
+        with patch.object(_ssl, "get_default_verify_paths", return_value=fake_paths):
+            ctx = MagicMock()
+            with patch.object(_ssl, "create_default_context", return_value=ctx):
+                cnl._build_ssl_context()
+            ctx.load_verify_locations.assert_not_called()
 
 
 # ── 15. TestGetUsageData ───────────────────────────────────────────────────────

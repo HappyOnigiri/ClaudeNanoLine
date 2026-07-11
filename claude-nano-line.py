@@ -797,17 +797,29 @@ def fmt_cost(usd, digits=2):
     return "${:.{d}f}".format(v, d=digits)
 
 
-def estimate_tokens(model_name, ctx_remaining_pct):
-    """モデル名と remaining_percentage から (used_tokens, total_tokens) を推定"""
+def estimate_tokens(model_name, ctx_remaining_pct, context_window=None):
+    """context_window の実測値を優先し、無ければモデル名と remaining_percentage から推定
+
+    Claude Code は statusline 入力 JSON の context_window に実測値
+    (context_window_size / total_input_tokens) を渡してくる。実測値があれば
+    それをそのまま使い、無い場合のみ従来のモデル名推定にフォールバックする。
+    モデル名推定は表示名に依存するため、"1m context" を含まない 1M モデル
+    (例: Fable 5) で誤って 200k と表示される問題があった。
+    """
     if ctx_remaining_pct is None:
         return None, None
-    m = model_name.lower()
-    total = DEFAULT_CONTEXT_SIZE
-    for key, size in MODEL_CONTEXT_SIZES.items():
-        if key in m:
-            total = size
-            break
-    used = int(total * (100 - int(ctx_remaining_pct)) / 100)
+    cw = context_window or {}
+    total = cw.get("context_window_size")
+    if not total:
+        m = model_name.lower()
+        total = DEFAULT_CONTEXT_SIZE
+        for key, size in MODEL_CONTEXT_SIZES.items():
+            if key in m:
+                total = size
+                break
+    used = cw.get("total_input_tokens")
+    if used is None:
+        used = int(total * (100 - int(ctx_remaining_pct)) / 100)
     return used, total
 
 
@@ -1085,7 +1097,7 @@ def render_custom(fmt, ctx_remaining, usage, model, cwd_real, git_branch, git_di
             return git_branch, COLOR_MAP.get(opts.get("color", ""), "")
 
         if name in ("ctx_tokens", "ctx_used_tokens", "ctx_total_tokens"):
-            used, total = estimate_tokens(model, ctx_remaining)
+            used, total = estimate_tokens(model, ctx_remaining, meta.get("context_window"))
             if name == "ctx_tokens":
                 raw = (total - used) if used is not None else None
             elif name == "ctx_used_tokens":
@@ -1357,6 +1369,7 @@ def main():
         "vim_mode": vim_obj.get("mode"),
         "version": input_data.get("version"),
         "exceeds_200k": input_data.get("exceeds_200k_tokens"),
+        "context_window": input_data.get("context_window") or {},
     }
 
     git_branch = get_git_branch(cwd_real) or get_git_commit(cwd_real)

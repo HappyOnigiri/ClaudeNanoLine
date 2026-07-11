@@ -1422,6 +1422,39 @@ class TestEstimateTokens(unittest.TestCase):
         self.assertIsNone(total)
 
 
+# ── estimate_tokens: context_window 実測値の優先 ─────────────────────────────────
+class TestEstimateTokensContextWindow(unittest.TestCase):
+    def test_context_window_size_wins_over_model_name(self):
+        # 表示名に "1m context" を含まない 1M モデル（例: Fable 5）でも実測値が勝つ
+        cw = {"context_window_size": 1_000_000, "total_input_tokens": 68_907}
+        used, total = cnl.estimate_tokens("Fable 5", 93, cw)
+        self.assertEqual(total, 1_000_000)
+        self.assertEqual(used, 68_907)
+
+    def test_total_input_tokens_used_verbatim(self):
+        cw = {"context_window_size": 200_000, "total_input_tokens": 12_345}
+        used, total = cnl.estimate_tokens("claude-sonnet-4-6", 94, cw)
+        self.assertEqual(used, 12_345)
+
+    def test_partial_context_window_falls_back_per_field(self):
+        # total_input_tokens が無ければ used は従来どおり percentage から推定
+        cw = {"context_window_size": 1_000_000}
+        used, total = cnl.estimate_tokens("Fable 5", 90, cw)
+        self.assertEqual(total, 1_000_000)
+        self.assertEqual(used, 100_000)
+
+    def test_missing_context_window_falls_back_to_model_name(self):
+        used, total = cnl.estimate_tokens("Opus 4.6 (1M context)", 85, None)
+        self.assertEqual(total, 1_000_000)
+        self.assertEqual(used, 150_000)
+
+    def test_none_remaining_still_returns_none(self):
+        cw = {"context_window_size": 1_000_000, "total_input_tokens": 68_907}
+        used, total = cnl.estimate_tokens("Fable 5", None, cw)
+        self.assertIsNone(used)
+        self.assertIsNone(total)
+
+
 # ── Feature 5: render_custom token placeholders ────────────────────────────────
 class TestRenderCustomTokens(unittest.TestCase):
     _USAGE = {
@@ -1445,6 +1478,22 @@ class TestRenderCustomTokens(unittest.TestCase):
     def test_ctx_total_tokens(self):
         out = strip_ansi(self._render("{ctx_total_tokens}", ctx=70))
         self.assertEqual(out, "200k")
+
+    def test_ctx_tokens_prefer_context_window_meta(self):
+        # meta 経由の実測値が表示名推定より優先される（Fable 5 は名前だけだと 200k 扱い）
+        meta = {"context_window": {"context_window_size": 1_000_000, "total_input_tokens": 68_907}}
+        out = strip_ansi(
+            cnl.render_custom(
+                "{ctx_used_tokens}/{ctx_total_tokens}",
+                93,
+                self._USAGE,
+                "Fable 5",
+                "/home/user/project",
+                "main",
+                meta=meta,
+            )
+        )
+        self.assertEqual(out, "68k/1.0M")
 
     def test_ctx_remaining_none_returns_dash(self):
         out = strip_ansi(self._render("{ctx_used_tokens}", ctx=None))

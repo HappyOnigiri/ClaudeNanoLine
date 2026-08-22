@@ -32,6 +32,3 @@ tmp/
 /.agent
 /.cursor
 /.antigravitycli
-
-# AI Rules
-/CLAUDE.md

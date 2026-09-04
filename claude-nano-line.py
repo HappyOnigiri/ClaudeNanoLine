@@ -987,22 +987,27 @@ def render_custom(fmt, ctx_remaining, usage, model, cwd_real, git_branch, git_di
 
     repo_cache = {}
 
-    def repo_fields():
+    def repo_fields(need_name=True):
         """(リポジトリ名, オーナー名) を返す。repo 系トークンが現れた時だけ解決する。
 
         `workspace.repo` から取れないときだけ git を起動し、結果は 1 描画内で使い回す。
+        フォールバックではオーナー名が得られず `{repo_owner}` / `{repo_full}` は必ず
+        空になるため、名前を必要としない解決では git を起動しない。
         """
-        if not repo_cache:
-            repo_name = str(meta.get("repo_name") or "")
-            repo_owner = str(meta.get("repo_owner") or "")
-            if not repo_name:
-                # remote 未設定や古い Claude Code 向けのフォールバック。
-                # オーナー名は得られないので空にする
-                repo_name = get_git_repo_name(cwd_real)
-                repo_owner = ""
-            repo_cache["name"] = repo_name
-            repo_cache["owner"] = repo_owner
-        return repo_cache["name"], repo_cache["owner"]
+        if "meta_name" not in repo_cache:
+            repo_cache["meta_name"] = str(meta.get("repo_name") or "")
+            repo_cache["meta_owner"] = str(meta.get("repo_owner") or "")
+        repo_name = repo_cache["meta_name"]
+        repo_owner = repo_cache["meta_owner"]
+        if not repo_name:
+            # remote 未設定や古い Claude Code 向けのフォールバック。
+            # オーナー名は得られないので空にする
+            repo_owner = ""
+            if need_name:
+                if "fallback_name" not in repo_cache:
+                    repo_cache["fallback_name"] = get_git_repo_name(cwd_real)
+                repo_name = repo_cache["fallback_name"]
+        return repo_name, repo_owner
 
     def resolve(name, opts):
         # pct 系
@@ -1136,7 +1141,8 @@ def render_custom(fmt, ctx_remaining, usage, model, cwd_real, git_branch, git_di
 
         # repo 系
         if name in ("repo", "repo_owner", "repo_full"):
-            repo_name, repo_owner = repo_fields()
+            # repo_owner / repo_full はフォールバックでは必ず空になるため名前を要求しない
+            repo_name, repo_owner = repo_fields(need_name=(name == "repo"))
             if name == "repo":
                 val = repo_name
             elif name == "repo_owner":

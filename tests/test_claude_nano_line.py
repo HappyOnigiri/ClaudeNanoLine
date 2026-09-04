@@ -2653,6 +2653,19 @@ class TestRepoPlaceholders(unittest.TestCase):
             strip_ansi(self._render("{model} {cwd} {branch}", meta={}))
             mock_repo.assert_not_called()
 
+    def test_no_git_call_for_repo_owner_only(self):
+        # フォールバックではオーナー名が得られないため、git を起動しても結果は捨てられる
+        with patch.object(cnl, "get_git_repo_name") as mock_repo:
+            out = strip_ansi(self._render("{repo_owner}", meta={}))
+            mock_repo.assert_not_called()
+        self.assertEqual(out, "")
+
+    def test_no_git_call_for_repo_full_only(self):
+        with patch.object(cnl, "get_git_repo_name") as mock_repo:
+            out = strip_ansi(self._render("{repo_full}", meta={}))
+            mock_repo.assert_not_called()
+        self.assertEqual(out, "")
+
     def test_all_empty_when_fallback_fails(self):
         with patch.object(cnl, "get_git_repo_name", return_value=""):
             out = strip_ansi(self._render("{repo}|{repo_owner}|{repo_full}", meta={}))

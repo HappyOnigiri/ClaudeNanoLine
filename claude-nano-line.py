@@ -220,6 +220,36 @@ def get_git_commit(cwd):
     return ""
 
 
+# ── Git repository name (fallback) ──────────────────────────────────────────────
+def get_git_repo_name(cwd):
+    """`--git-common-dir` の親ディレクトリ名を返す。
+
+    `workspace.repo` が無いときのフォールバック。共通 git ディレクトリを見るため、
+    git worktree 配下でも本体リポジトリのディレクトリ名になる。
+    """
+    if not cwd:
+        return ""
+    try:
+        result = subprocess.run(
+            ["git", "-C", cwd, "rev-parse", "--git-common-dir"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode != 0:
+            return ""
+        git_dir = result.stdout.strip()
+        if not git_dir:
+            return ""
+        # `--git-common-dir` は cwd 基準の相対パス（`.git` 等）を返すことがある
+        if not os.path.isabs(git_dir):
+            git_dir = os.path.join(cwd, git_dir)
+        return os.path.basename(os.path.dirname(os.path.abspath(git_dir)))
+    except Exception:
+        pass
+    return ""
+
+
 # ── OAuth token ─────────────────────────────────────────────────────────────────
 def _extract_token(oauth_data):
     """claudeAiOauth dict からトークンを取り出し、期限切れなら warn ログを出す。
@@ -945,6 +975,25 @@ def render_custom(fmt, ctx_remaining, usage, model, cwd_real, git_branch, git_di
 
     meta = meta or {}
 
+    repo_cache = {}
+
+    def repo_fields():
+        """(リポジトリ名, オーナー名) を返す。repo 系トークンが現れた時だけ解決する。
+
+        `workspace.repo` から取れないときだけ git を起動し、結果は 1 描画内で使い回す。
+        """
+        if not repo_cache:
+            repo_name = str(meta.get("repo_name") or "")
+            repo_owner = str(meta.get("repo_owner") or "")
+            if not repo_name:
+                # remote 未設定や古い Claude Code 向けのフォールバック。
+                # オーナー名は得られないので空にする
+                repo_name = get_git_repo_name(cwd_real)
+                repo_owner = ""
+            repo_cache["name"] = repo_name
+            repo_cache["owner"] = repo_owner
+        return repo_cache["name"], repo_cache["owner"]
+
     def resolve(name, opts):
         # pct 系
         if name in ("ctx_pct", "5h_pct", "7d_pct"):
@@ -1071,6 +1120,21 @@ def render_custom(fmt, ctx_remaining, usage, model, cwd_real, git_branch, git_di
             return val, COLOR_MAP.get(opts.get("color", ""), "")
         if name == "cwd_full":
             val = cwd_real or ""
+            if opts.get("hide-if", "") == val:
+                return "", ""
+            return val, COLOR_MAP.get(opts.get("color", ""), "")
+
+        # repo 系
+        if name in ("repo", "repo_owner", "repo_full"):
+            repo_name, repo_owner = repo_fields()
+            if name == "repo":
+                val = repo_name
+            elif name == "repo_owner":
+                val = repo_owner
+            else:  # repo_full
+                val = repo_owner + "/" + repo_name if repo_owner and repo_name else ""
+            if not val:
+                return "", ""
             if opts.get("hide-if", "") == val:
                 return "", ""
             return val, COLOR_MAP.get(opts.get("color", ""), "")
@@ -1349,7 +1413,8 @@ def main():
     except Exception:
         input_data = {}
 
-    cwd_real = (input_data.get("workspace") or {}).get("current_dir") or input_data.get("cwd", "") or ""
+    workspace_obj = input_data.get("workspace") or {}
+    cwd_real = workspace_obj.get("current_dir") or input_data.get("cwd", "") or ""
     model = (input_data.get("model") or {}).get("display_name", "")
     ctx_remaining = (input_data.get("context_window") or {}).get("remaining_percentage")
 
@@ -1357,6 +1422,9 @@ def main():
     effort_obj = input_data.get("effort") or {}
     output_style_obj = input_data.get("output_style") or {}
     vim_obj = input_data.get("vim") or {}
+    repo_obj = workspace_obj.get("repo")
+    if not isinstance(repo_obj, dict):
+        repo_obj = {}
     meta = {
         "cost_usd": cost_obj.get("total_cost_usd"),
         "duration_ms": cost_obj.get("total_duration_ms"),
@@ -1370,6 +1438,8 @@ def main():
         "version": input_data.get("version"),
         "exceeds_200k": input_data.get("exceeds_200k_tokens"),
         "context_window": input_data.get("context_window") or {},
+        "repo_name": repo_obj.get("name"),
+        "repo_owner": repo_obj.get("owner"),
     }
 
     git_branch = get_git_branch(cwd_real) or get_git_commit(cwd_real)

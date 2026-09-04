@@ -287,7 +287,8 @@ export CLAUDE_NANO_LINE_FORMAT="{model} {cwd} {branch|hide-if:main}"
 # Repository name instead of the directory name (stable inside a Git worktree)
 export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {model} {repo|color:sky_blue} {branch_dirty|color:cyan}"
 
-# Repository name, plus the directory name only when it differs
+# Repository name; hide the directory name when it matches the given literal
+# (replace ClaudeNanoLine with your repository name)
 export CLAUDE_NANO_LINE_FORMAT="{repo|color:sky_blue} {cwd|hide-if:ClaudeNanoLine,prefix:(,suffix:)} {branch_dirty}"
 
 # Hide branch on main, hide usage under 80%

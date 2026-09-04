@@ -282,7 +282,8 @@ export CLAUDE_NANO_LINE_FORMAT="{model} {cwd} {branch|hide-if:main}"
 # ディレクトリ名の代わりにリポジトリ名を表示（git worktree でも変わらない）
 export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {model} {repo|color:sky_blue} {branch_dirty|color:cyan}"
 
-# リポジトリ名を表示し、ディレクトリ名は異なるときだけ添える
+# リポジトリ名を表示し、ディレクトリ名が指定した文字列（例では ClaudeNanoLine）と
+# 一致するときだけ隠す
 export CLAUDE_NANO_LINE_FORMAT="{repo|color:sky_blue} {cwd|hide-if:ClaudeNanoLine,prefix:(,suffix:)} {branch_dirty}"
 
 # main ブランチでは非表示・使用率 80% 未満は非表示

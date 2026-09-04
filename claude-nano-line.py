@@ -241,10 +241,20 @@ def get_git_repo_name(cwd):
         git_dir = result.stdout.strip()
         if not git_dir:
             return ""
-        # `--git-common-dir` は cwd 基準の相対パス（`.git` 等）を返すことがある
+        # `--git-common-dir` は cwd 基準の相対パス（`.git`、`../.git` 等）を返すことがある。
+        # `..` を字句的に畳むと cwd 側のシンボリックリンクで解決先がずれるため realpath を使う
         if not os.path.isabs(git_dir):
             git_dir = os.path.join(cwd, git_dir)
-        return os.path.basename(os.path.dirname(os.path.abspath(git_dir)))
+        git_dir = os.path.realpath(git_dir)
+        base = os.path.basename(git_dir)
+        if base == ".git":
+            # 通常のワークツリー・worktree: `<repo>/.git` の親がリポジトリ名
+            return os.path.basename(os.path.dirname(git_dir))
+        # bare（`<repo>.git`）や submodule（`.git/modules/<path>/<name>`）は
+        # 共通 git ディレクトリ自体がリポジトリ名を持つ
+        if base.endswith(".git"):
+            base = base[: -len(".git")]
+        return base
     except Exception:
         pass
     return ""

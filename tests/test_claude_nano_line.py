@@ -2536,6 +2536,29 @@ class TestGetGitRepoName(unittest.TestCase):
             self.assertEqual(cnl.get_git_repo_name(None), "")
             mock_run.assert_not_called()
 
+    def test_bare_repo_uses_common_dir_name(self):
+        # bare リポジトリでは --git-common-dir が "." を返し、cwd 自体が `<repo>.git`
+        with patch.object(cnl.subprocess, "run", return_value=self._mock_run(0, ".\n")):
+            self.assertEqual(cnl.get_git_repo_name("/home/user/Bare.git"), "Bare")
+
+    def test_submodule_uses_common_dir_name(self):
+        # submodule では `<super>/.git/modules/<path>/<name>` を返す
+        with patch.object(
+            cnl.subprocess, "run", return_value=self._mock_run(0, "/home/user/Super/.git/modules/libs/sublib\n")
+        ):
+            self.assertEqual(cnl.get_git_repo_name("/home/user/Super/libs/sublib"), "sublib")
+
+    def test_relative_common_dir_resolves_symlinked_cwd(self):
+        # cwd がシンボリックリンクだと `..` の字句的な畳み込みでは解決先がずれる
+        with tempfile.TemporaryDirectory() as tmp:
+            real_root = os.path.realpath(tmp)
+            sub = os.path.join(real_root, "MyRepo", "sub")
+            os.makedirs(sub)
+            link = os.path.join(real_root, "linksub")
+            os.symlink(sub, link)
+            with patch.object(cnl.subprocess, "run", return_value=self._mock_run(0, "../.git\n")):
+                self.assertEqual(cnl.get_git_repo_name(link), "MyRepo")
+
 
 # ── {repo} / {repo_owner} / {repo_full} ────────────────────────────────────────
 class TestRepoPlaceholders(unittest.TestCase):

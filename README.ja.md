@@ -164,6 +164,9 @@ export CLAUDE_NANO_LINE_THEME=ocean
 | `cwd`              | `myproject`       | ディレクトリ basename                                                 |
 | `cwd_short`        | `~/dev/proj`      | `~` 省略パス                                                          |
 | `cwd_full`         | `/Users/.../proj` | フルパス                                                              |
+| `repo`             | `ClaudeNanoLine`  | リポジトリ名（`workspace.repo.name` から。取れない場合は本体リポジトリのディレクトリ名にフォールバックするため、`cd` しても git worktree 内でも変わらない） |
+| `repo_owner`       | `HappyOnigiri`    | リポジトリのオーナー名（`workspace.repo.owner` から。remote 不明なら空） |
+| `repo_full`        | `HappyOnigiri/ClaudeNanoLine` | `owner/name`（オーナー名が不明なら空）                    |
 | `branch`           | `main`            | Git ブランチ名                                                        |
 | `branch_dirty`     | `main*`           | Git ブランチ名（未コミット変更がある場合に `*` などのマーカーを付加） |
 | `ctx_tokens`       | `140k`            | コンテキスト残りトークン数（モデル名から推定）                        |
@@ -186,6 +189,8 @@ export CLAUDE_NANO_LINE_THEME=ocean
 | key               | 対象                     | 値                                                                                | デフォルト               | 説明                                                                                                  |
 | ----------------- | ------------------------ | --------------------------------------------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------- |
 | `color`           | 全て                     | 色名                                                                              | なし                     | 表示色                                                                                                |
+| `prefix`          | 全ての値プレースホルダー | 文字列                                                                            | なし                     | 解決後の値が空でないときだけ、値の前に挿入する文字列。`text:` / `cmd:` トークンには適用されない       |
+| `suffix`          | 全ての値プレースホルダー | 文字列                                                                            | なし                     | 解決後の値が空でないときだけ、値の後ろに付加する文字列。`text:` / `cmd:` トークンには適用されない     |
 | `warn-color`      | `*_pct`                  | 色名                                                                              | `yellow`                 | 警告時の色                                                                                            |
 | `alert-color`     | `*_pct`                  | 色名                                                                              | `red`                    | 危険時の色                                                                                            |
 | `warn-threshold`  | `*_pct`                  | 数値                                                                              | `80`                     | 警告しきい値（%）                                                                                     |
@@ -202,7 +207,7 @@ export CLAUDE_NANO_LINE_THEME=ocean
 | `hide-zero`       | `cost`, `lines_added`, `lines_removed`      | `1`                                                                        | —                        | 値がちょうど 0 の場合に非表示にする                                                                  |
 | `digits`          | `cost`                                      | 数値                                                                       | `2`                      | コスト金額の小数桁数（例: `digits:3` → `$0.421`）                                                    |
 | `text`            | `exceeds_200k`                              | 文字列                                                                     | `200k+`                  | インジケータ発火時に表示するカスタムラベル                                                          |
-| `hide-if`         | `branch`, `branch_dirty`, `model`, `cwd`, `cwd_short`, `cwd_full`, `effort`, `output_style`, `vim_mode` | 文字列                              | —                        | 解決後の値が指定文字列と完全一致（大文字小文字区別）する場合に非表示にする                           |
+| `hide-if`         | `branch`, `branch_dirty`, `model`, `cwd`, `cwd_short`, `cwd_full`, `repo`, `repo_owner`, `repo_full`, `effort`, `output_style`, `vim_mode` | 文字列                              | —                        | 解決後の値が指定文字列と完全一致（大文字小文字区別）する場合に非表示にする                           |
 | `dirty-suffix`    | `branch`, `branch_dirty` | 文字列                                                                            | `*` / `""`               | dirty 時に付加するサフィックス（`branch_dirty` デフォルト: `*`、`branch` はデフォルト空でオプトイン） |
 | `dirty-color`     | `branch`, `branch_dirty` | 色名                                                                              | `color` にフォールバック | dirty 時の色                                                                                          |
 | `haiku-color`     | `model`                  | 色名                                                                              | `amber`                  | Haiku モデル時の色                                                                                    |
@@ -273,6 +278,13 @@ export CLAUDE_NANO_LINE_FORMAT="{5h_pct|hide-under:70} {7d_pct|hide-under:70} {m
 
 # main ブランチ以外のときだけブランチ名を表示
 export CLAUDE_NANO_LINE_FORMAT="{model} {cwd} {branch|hide-if:main}"
+
+# ディレクトリ名の代わりにリポジトリ名を表示（git worktree でも変わらない）
+export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {model} {repo|color:sky_blue} {branch_dirty|color:cyan}"
+
+# リポジトリ名を表示し、ディレクトリ名が指定した文字列（例では ClaudeNanoLine）と
+# 一致するときだけ隠す
+export CLAUDE_NANO_LINE_FORMAT="{repo|color:sky_blue} {cwd|hide-if:ClaudeNanoLine,prefix:(,suffix:)} {branch_dirty}"
 
 # main ブランチでは非表示・使用率 80% 未満は非表示
 export CLAUDE_NANO_LINE_FORMAT="{5h_pct|hide-under:80} {model} {branch|hide-if:main}"

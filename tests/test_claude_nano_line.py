@@ -931,7 +931,9 @@ class TestGetUsageData(unittest.TestCase):
 
 
 # ── 16. TestMainIntegration ────────────────────────────────────────────────────
-class TestMainIntegration(unittest.TestCase):
+class MainIntegrationTestCase(unittest.TestCase):
+    """main() を stdin JSON から実行する統合テストの共通土台。"""
+
     _USAGE = {
         "five_hour_pct": 42,
         "seven_day_pct": 60,
@@ -964,6 +966,8 @@ class TestMainIntegration(unittest.TestCase):
                                     cnl.main()
                                 return captured.getvalue()
 
+
+class TestMainIntegration(MainIntegrationTestCase):
     def test_default_mode(self):
         input_data = {
             "model": {"display_name": "claude-sonnet-4"},
@@ -2487,6 +2491,232 @@ class TestAutoFixOneRunRetries(unittest.TestCase):
         self.assertEqual(result, {"api_error": "auth"})
         self.assertEqual(mock_urlopen.call_count, 2)
         mock_sub.run.assert_not_called()
+
+
+# ── get_git_repo_name（{repo} 系のフォールバック） ───────────────────────────────
+class TestGetGitRepoName(unittest.TestCase):
+    def _mock_run(self, returncode, stdout=""):
+        mock_result = MagicMock()
+        mock_result.returncode = returncode
+        mock_result.stdout = stdout
+        return mock_result
+
+    def test_absolute_git_common_dir(self):
+        with patch.object(
+            cnl.subprocess, "run", return_value=self._mock_run(0, "/home/user/MyRepo/.git\n")
+        ) as mock_run:
+            self.assertEqual(cnl.get_git_repo_name("/home/user/MyRepo"), "MyRepo")
+        # worktree でも本体リポジトリ名になる挙動は --git-common-dir に依存するため、
+        # 引数とタイムアウトをテストで固定する
+        mock_run.assert_called_once_with(
+            ["git", "-C", "/home/user/MyRepo", "rev-parse", "--git-common-dir"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+
+    def test_relative_git_common_dir_resolved_against_cwd(self):
+        with patch.object(cnl.subprocess, "run", return_value=self._mock_run(0, ".git\n")):
+            self.assertEqual(cnl.get_git_repo_name("/home/user/MyRepo"), "MyRepo")
+
+    def test_worktree_returns_main_repo_name(self):
+        # worktree では --git-common-dir が本体リポジトリの .git を指す
+        with patch.object(
+            cnl.subprocess, "run", return_value=self._mock_run(0, "/home/user/MyRepo/.git\n")
+        ) as mock_run:
+            self.assertEqual(cnl.get_git_repo_name("/home/user/worktrees/slots/root"), "MyRepo")
+        # worktree のパスがそのまま `git -C` に渡ることを固定する
+        mock_run.assert_called_once_with(
+            ["git", "-C", "/home/user/worktrees/slots/root", "rev-parse", "--git-common-dir"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+
+    def test_failure(self):
+        with patch.object(cnl.subprocess, "run", return_value=self._mock_run(128)):
+            self.assertEqual(cnl.get_git_repo_name("/some/path"), "")
+
+    def test_empty_stdout(self):
+        with patch.object(cnl.subprocess, "run", return_value=self._mock_run(0, "\n")):
+            self.assertEqual(cnl.get_git_repo_name("/some/path"), "")
+
+    def test_exception(self):
+        with patch.object(cnl.subprocess, "run", side_effect=Exception("oops")):
+            self.assertEqual(cnl.get_git_repo_name("/some/path"), "")
+
+    def test_timeout(self):
+        with patch.object(cnl.subprocess, "run", side_effect=cnl.subprocess.TimeoutExpired("git", 5)):
+            self.assertEqual(cnl.get_git_repo_name("/some/path"), "")
+
+    def test_empty_cwd(self):
+        with patch.object(cnl.subprocess, "run") as mock_run:
+            self.assertEqual(cnl.get_git_repo_name(""), "")
+            mock_run.assert_not_called()
+
+    def test_none_cwd(self):
+        with patch.object(cnl.subprocess, "run") as mock_run:
+            self.assertEqual(cnl.get_git_repo_name(None), "")
+            mock_run.assert_not_called()
+
+    def test_bare_repo_uses_common_dir_name(self):
+        # bare リポジトリでは --git-common-dir が "." を返し、cwd 自体が `<repo>.git`
+        with patch.object(cnl.subprocess, "run", return_value=self._mock_run(0, ".\n")):
+            self.assertEqual(cnl.get_git_repo_name("/home/user/Bare.git"), "Bare")
+
+    def test_submodule_uses_common_dir_name(self):
+        # submodule では `<super>/.git/modules/<path>/<name>` を返す
+        with patch.object(
+            cnl.subprocess, "run", return_value=self._mock_run(0, "/home/user/Super/.git/modules/libs/sublib\n")
+        ):
+            self.assertEqual(cnl.get_git_repo_name("/home/user/Super/libs/sublib"), "sublib")
+
+    def test_relative_common_dir_resolves_symlinked_cwd(self):
+        # cwd がシンボリックリンクだと `..` の字句的な畳み込みでは解決先がずれる
+        with tempfile.TemporaryDirectory() as tmp:
+            real_root = os.path.realpath(tmp)
+            sub = os.path.join(real_root, "MyRepo", "sub")
+            os.makedirs(sub)
+            link = os.path.join(real_root, "linksub")
+            os.symlink(sub, link)
+            with patch.object(cnl.subprocess, "run", return_value=self._mock_run(0, "../.git\n")):
+                self.assertEqual(cnl.get_git_repo_name(link), "MyRepo")
+
+
+# ── {repo} / {repo_owner} / {repo_full} ────────────────────────────────────────
+class TestRepoPlaceholders(unittest.TestCase):
+    _META = {"repo_name": "ClaudeNanoLine", "repo_owner": "HappyOnigiri"}
+
+    def _render(self, fmt, meta=None, cwd="/home/user/project"):
+        return cnl.render_custom(fmt, 50, {}, "claude-sonnet-4-6", cwd, "main", False, meta)
+
+    def test_repo_from_workspace(self):
+        out = strip_ansi(self._render("{repo}", meta=self._META))
+        self.assertEqual(out, "ClaudeNanoLine")
+
+    def test_repo_owner_from_workspace(self):
+        out = strip_ansi(self._render("{repo_owner}", meta=self._META))
+        self.assertEqual(out, "HappyOnigiri")
+
+    def test_repo_full_from_workspace(self):
+        out = strip_ansi(self._render("{repo_full}", meta=self._META))
+        self.assertEqual(out, "HappyOnigiri/ClaudeNanoLine")
+
+    def test_no_git_call_when_workspace_repo_present(self):
+        with patch.object(cnl, "get_git_repo_name") as mock_repo:
+            out = strip_ansi(self._render("{repo_full}", meta=self._META))
+            mock_repo.assert_not_called()
+        self.assertEqual(out, "HappyOnigiri/ClaudeNanoLine")
+
+    def test_color_option(self):
+        out = self._render("{repo|color:cyan}", meta=self._META)
+        self.assertIn(cnl.COLOR_MAP["cyan"], out)
+        self.assertIn("ClaudeNanoLine", out)
+
+    def test_prefix_suffix(self):
+        out = strip_ansi(self._render("{repo|prefix:[,suffix:]}", meta=self._META))
+        self.assertEqual(out, "[ClaudeNanoLine]")
+
+    def test_hide_if_matches(self):
+        out = strip_ansi(self._render("{repo|hide-if:ClaudeNanoLine}", meta=self._META))
+        self.assertEqual(out, "")
+
+    def test_hide_if_no_match(self):
+        out = strip_ansi(self._render("{repo|hide-if:other}", meta=self._META))
+        self.assertEqual(out, "ClaudeNanoLine")
+
+    def test_hide_if_repo_full(self):
+        out = strip_ansi(self._render("{repo_full|hide-if:HappyOnigiri/ClaudeNanoLine}", meta=self._META))
+        self.assertEqual(out, "")
+
+    def test_owner_missing_makes_repo_full_empty(self):
+        meta = {"repo_name": "ClaudeNanoLine"}
+        with patch.object(cnl, "get_git_repo_name") as mock_repo:
+            out = strip_ansi(self._render("{repo}|{repo_owner}|{repo_full}", meta=meta))
+            mock_repo.assert_not_called()
+        self.assertEqual(out, "ClaudeNanoLine||")
+
+    def test_fallback_when_workspace_repo_absent(self):
+        with patch.object(cnl, "get_git_repo_name", return_value="MyRepo") as mock_repo:
+            out = strip_ansi(self._render("{repo}|{repo_owner}|{repo_full}", meta={}))
+            mock_repo.assert_called_once_with("/home/user/project")
+        self.assertEqual(out, "MyRepo||")
+
+    def test_fallback_runs_git_only_once_per_render(self):
+        with patch.object(cnl, "get_git_repo_name", return_value="MyRepo") as mock_repo:
+            out = strip_ansi(self._render("{repo} {repo} {repo_full}", meta={}))
+            self.assertEqual(mock_repo.call_count, 1)
+        self.assertEqual(out, "MyRepo MyRepo ")
+
+    def test_no_git_call_without_repo_tokens(self):
+        with patch.object(cnl, "get_git_repo_name") as mock_repo:
+            strip_ansi(self._render("{model} {cwd} {branch}", meta={}))
+            mock_repo.assert_not_called()
+
+    def test_no_git_call_for_repo_owner_only(self):
+        # フォールバックではオーナー名が得られないため、git を起動しても結果は捨てられる
+        with patch.object(cnl, "get_git_repo_name") as mock_repo:
+            out = strip_ansi(self._render("{repo_owner}", meta={}))
+            mock_repo.assert_not_called()
+        self.assertEqual(out, "")
+
+    def test_no_git_call_for_repo_full_only(self):
+        with patch.object(cnl, "get_git_repo_name") as mock_repo:
+            out = strip_ansi(self._render("{repo_full}", meta={}))
+            mock_repo.assert_not_called()
+        self.assertEqual(out, "")
+
+    def test_all_empty_when_fallback_fails(self):
+        with patch.object(cnl, "get_git_repo_name", return_value=""):
+            out = strip_ansi(self._render("{repo}|{repo_owner}|{repo_full}", meta={}))
+        self.assertEqual(out, "||")
+
+    def test_fallback_uses_real_subprocess_result(self):
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "/home/user/MyRepo/.git\n"
+        with patch.object(cnl.subprocess, "run", return_value=mock_result):
+            out = strip_ansi(self._render("{repo}", meta={}))
+        self.assertEqual(out, "MyRepo")
+
+
+# ── main() integration for {repo} 系 ───────────────────────────────────────────
+class TestRepoMainIntegration(MainIntegrationTestCase):
+    _USAGE = {}
+
+    def _render_main(self, input_data, fmt):
+        return strip_ansi(self._run_main(input_data, env={"CLAUDE_NANO_LINE_FORMAT": fmt}))
+
+    def test_workspace_repo_is_used(self):
+        input_data = {
+            "model": {"display_name": "claude-sonnet-4-6"},
+            "workspace": {
+                "current_dir": "/home/user/project",
+                "repo": {"host": "github.com", "owner": "HappyOnigiri", "name": "ClaudeNanoLine"},
+            },
+        }
+        with patch.object(cnl, "get_git_repo_name") as mock_repo:
+            out = self._render_main(input_data, "{repo_full}")
+            mock_repo.assert_not_called()
+        self.assertEqual(out, "HappyOnigiri/ClaudeNanoLine")
+
+    def test_missing_workspace_repo_falls_back(self):
+        input_data = {
+            "model": {"display_name": "claude-sonnet-4-6"},
+            "workspace": {"current_dir": "/home/user/project"},
+        }
+        with patch.object(cnl, "get_git_repo_name", return_value="MyRepo"):
+            out = self._render_main(input_data, "{repo}|{repo_owner}")
+        self.assertEqual(out, "MyRepo|")
+
+    def test_non_dict_workspace_repo_falls_back(self):
+        input_data = {
+            "model": {"display_name": "claude-sonnet-4-6"},
+            "workspace": {"current_dir": "/home/user/project", "repo": "github.com/HappyOnigiri/ClaudeNanoLine"},
+        }
+        with patch.object(cnl, "get_git_repo_name", return_value="MyRepo"):
+            out = self._render_main(input_data, "{repo}")
+        self.assertEqual(out, "MyRepo")
 
 
 if __name__ == "__main__":

@@ -169,6 +169,9 @@ Use backticks when the command contains `|`, `:`, or `}`. Inside backticks, `` \
 | `cwd`              | `myproject`       | Directory basename                                                     |
 | `cwd_short`        | `~/dev/proj`      | `~`-abbreviated path                                                   |
 | `cwd_full`         | `/Users/.../proj` | Full path                                                              |
+| `repo`             | `ClaudeNanoLine`  | Repository name (from `workspace.repo.name`; falls back to the main repository directory name, so it stays stable after `cd` and inside a Git worktree) |
+| `repo_owner`       | `HappyOnigiri`    | Repository owner (from `workspace.repo.owner`; empty when the remote is unknown) |
+| `repo_full`        | `HappyOnigiri/ClaudeNanoLine` | `owner/name` (empty when the owner is unknown)              |
 | `branch`           | `main`            | Git branch name (detached HEAD shows short commit hash, e.g. `abc1234`) |
 | `branch_dirty`     | `main*`           | Git branch name with dirty marker (`*` when uncommitted changes exist); detached HEAD shows hash with marker |
 | `ctx_tokens`       | `140k`            | Remaining context tokens (estimated from model)                        |
@@ -191,6 +194,8 @@ Use backticks when the command contains `|`, `:`, or `}`. Inside backticks, `` \
 | Key               | Applies to               | Values                                                                            | Default               | Description                                                                                            |
 | ----------------- | ------------------------ | --------------------------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------ |
 | `color`           | all                      | color name                                                                        | none                  | Display color                                                                                          |
+| `prefix`          | all value placeholders   | string                                                                            | none                  | Text inserted before the value, only when the resolved value is non-empty. Not applied to `text:` / `cmd:` tokens |
+| `suffix`          | all value placeholders   | string                                                                            | none                  | Text appended after the value, only when the resolved value is non-empty. Not applied to `text:` / `cmd:` tokens |
 | `warn-color`      | `*_pct`                  | color name                                                                        | `yellow`              | Color when usage exceeds warn threshold                                                                |
 | `alert-color`     | `*_pct`                  | color name                                                                        | `red`                 | Color when usage exceeds alert threshold                                                               |
 | `warn-threshold`  | `*_pct`                  | number                                                                            | `80`                  | Warning threshold (%)                                                                                  |
@@ -207,7 +212,7 @@ Use backticks when the command contains `|`, `:`, or `}`. Inside backticks, `` \
 | `hide-zero`       | `cost`, `lines_added`, `lines_removed`      | `1`                                                                        | —                     | Hide the token when the value is exactly zero                                                          |
 | `digits`          | `cost`                                      | number                                                                     | `2`                   | Decimal places for the cost amount (e.g. `digits:3` → `$0.421`)                                       |
 | `text`            | `exceeds_200k`                              | string                                                                     | `200k+`               | Custom label to display when the indicator triggers                                                   |
-| `hide-if`         | `branch`, `branch_dirty`, `model`, `cwd`, `cwd_short`, `cwd_full`, `effort`, `output_style`, `vim_mode` | string                              | —                     | Hide the token when its resolved value equals the given string (exact/case-sensitive match)           |
+| `hide-if`         | `branch`, `branch_dirty`, `model`, `cwd`, `cwd_short`, `cwd_full`, `repo`, `repo_owner`, `repo_full`, `effort`, `output_style`, `vim_mode` | string                              | —                     | Hide the token when its resolved value equals the given string (exact/case-sensitive match)           |
 | `dirty-suffix`    | `branch`, `branch_dirty` | string                                                                            | `*` / `""`            | Suffix appended when repo is dirty (`branch_dirty` default: `*`; `branch` default: `""` — opt-in only) |
 | `dirty-color`     | `branch`, `branch_dirty` | color name                                                                        | falls back to `color` | Color when repo is dirty                                                                               |
 | `haiku-color`     | `model`                  | color name                                                                        | `amber`               | Color for Haiku model                                                                                  |
@@ -278,6 +283,13 @@ export CLAUDE_NANO_LINE_FORMAT="{5h_pct|hide-under:70} {7d_pct|hide-under:70} {m
 
 # Show branch name only when not on main
 export CLAUDE_NANO_LINE_FORMAT="{model} {cwd} {branch|hide-if:main}"
+
+# Repository name instead of the directory name (stable inside a Git worktree)
+export CLAUDE_NANO_LINE_FORMAT="{5h_pct} {model} {repo|color:sky_blue} {branch_dirty|color:cyan}"
+
+# Repository name; hide the directory name when it matches the given literal
+# (replace ClaudeNanoLine with your repository name)
+export CLAUDE_NANO_LINE_FORMAT="{repo|color:sky_blue} {cwd|hide-if:ClaudeNanoLine,prefix:(,suffix:)} {branch_dirty}"
 
 # Hide branch on main, hide usage under 80%
 export CLAUDE_NANO_LINE_FORMAT="{5h_pct|hide-under:80} {model} {branch|hide-if:main}"

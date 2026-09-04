@@ -220,6 +220,46 @@ def get_git_commit(cwd):
     return ""
 
 
+# ── Git repository name (fallback) ──────────────────────────────────────────────
+def get_git_repo_name(cwd):
+    """`--git-common-dir` の親ディレクトリ名を返す。
+
+    `workspace.repo` が無いときのフォールバック。共通 git ディレクトリを見るため、
+    git worktree 配下でも本体リポジトリのディレクトリ名になる。
+    """
+    if not cwd:
+        return ""
+    try:
+        result = subprocess.run(
+            ["git", "-C", cwd, "rev-parse", "--git-common-dir"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode != 0:
+            return ""
+        git_dir = result.stdout.strip()
+        if not git_dir:
+            return ""
+        # `--git-common-dir` は cwd 基準の相対パス（`.git`、`../.git` 等）を返すことがある。
+        # `..` を字句的に畳むと cwd 側のシンボリックリンクで解決先がずれるため realpath を使う
+        if not os.path.isabs(git_dir):
+            git_dir = os.path.join(cwd, git_dir)
+        git_dir = os.path.realpath(git_dir)
+        base = os.path.basename(git_dir)
+        if base == ".git":
+            # 通常のワークツリー・worktree: `<repo>/.git` の親がリポジトリ名
+            return os.path.basename(os.path.dirname(git_dir))
+        # bare（`<repo>.git`）や submodule（`.git/modules/<path>/<name>`）は
+        # 共通 git ディレクトリ自体がリポジトリ名を持つ
+        if base.endswith(".git"):
+            base = base[: -len(".git")]
+        return base
+    except Exception:
+        pass
+    return ""
+
+
 # ── OAuth token ─────────────────────────────────────────────────────────────────
 def _extract_token(oauth_data):
     """claudeAiOauth dict からトークンを取り出し、期限切れなら warn ログを出す。
@@ -945,6 +985,30 @@ def render_custom(fmt, ctx_remaining, usage, model, cwd_real, git_branch, git_di
 
     meta = meta or {}
 
+    repo_cache = {}
+
+    def repo_fields(need_name=True):
+        """(リポジトリ名, オーナー名) を返す。repo 系トークンが現れた時だけ解決する。
+
+        `workspace.repo` から取れないときだけ git を起動し、結果は 1 描画内で使い回す。
+        フォールバックではオーナー名が得られず `{repo_owner}` / `{repo_full}` は必ず
+        空になるため、名前を必要としない解決では git を起動しない。
+        """
+        if "meta_name" not in repo_cache:
+            repo_cache["meta_name"] = str(meta.get("repo_name") or "")
+            repo_cache["meta_owner"] = str(meta.get("repo_owner") or "")
+        repo_name = repo_cache["meta_name"]
+        repo_owner = repo_cache["meta_owner"]
+        if not repo_name:
+            # remote 未設定や古い Claude Code 向けのフォールバック。
+            # オーナー名は得られないので空にする
+            repo_owner = ""
+            if need_name:
+                if "fallback_name" not in repo_cache:
+                    repo_cache["fallback_name"] = get_git_repo_name(cwd_real)
+                repo_name = repo_cache["fallback_name"]
+        return repo_name, repo_owner
+
     def resolve(name, opts):
         # pct 系
         if name in ("ctx_pct", "5h_pct", "7d_pct"):
@@ -1071,6 +1135,22 @@ def render_custom(fmt, ctx_remaining, usage, model, cwd_real, git_branch, git_di
             return val, COLOR_MAP.get(opts.get("color", ""), "")
         if name == "cwd_full":
             val = cwd_real or ""
+            if opts.get("hide-if", "") == val:
+                return "", ""
+            return val, COLOR_MAP.get(opts.get("color", ""), "")
+
+        # repo 系
+        if name in ("repo", "repo_owner", "repo_full"):
+            # repo_owner / repo_full はフォールバックでは必ず空になるため名前を要求しない
+            repo_name, repo_owner = repo_fields(need_name=(name == "repo"))
+            if name == "repo":
+                val = repo_name
+            elif name == "repo_owner":
+                val = repo_owner
+            else:  # repo_full
+                val = repo_owner + "/" + repo_name if repo_owner and repo_name else ""
+            if not val:
+                return "", ""
             if opts.get("hide-if", "") == val:
                 return "", ""
             return val, COLOR_MAP.get(opts.get("color", ""), "")
@@ -1349,7 +1429,8 @@ def main():
     except Exception:
         input_data = {}
 
-    cwd_real = (input_data.get("workspace") or {}).get("current_dir") or input_data.get("cwd", "") or ""
+    workspace_obj = input_data.get("workspace") or {}
+    cwd_real = workspace_obj.get("current_dir") or input_data.get("cwd", "") or ""
     model = (input_data.get("model") or {}).get("display_name", "")
     ctx_remaining = (input_data.get("context_window") or {}).get("remaining_percentage")
 
@@ -1357,6 +1438,9 @@ def main():
     effort_obj = input_data.get("effort") or {}
     output_style_obj = input_data.get("output_style") or {}
     vim_obj = input_data.get("vim") or {}
+    repo_obj = workspace_obj.get("repo")
+    if not isinstance(repo_obj, dict):
+        repo_obj = {}
     meta = {
         "cost_usd": cost_obj.get("total_cost_usd"),
         "duration_ms": cost_obj.get("total_duration_ms"),
@@ -1370,6 +1454,8 @@ def main():
         "version": input_data.get("version"),
         "exceeds_200k": input_data.get("exceeds_200k_tokens"),
         "context_window": input_data.get("context_window") or {},
+        "repo_name": repo_obj.get("name"),
+        "repo_owner": repo_obj.get("owner"),
     }
 
     git_branch = get_git_branch(cwd_real) or get_git_commit(cwd_real)

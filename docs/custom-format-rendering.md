@@ -44,6 +44,10 @@ Claude Code input is extracted in `main()`; newer session metadata is grouped in
   commit hash.
 - Dirty detection intentionally excludes untracked files. Preserve that scope
   unless the user-facing meaning of dirty is deliberately changed.
+- Repository identity comes from `workspace.repo` in the Claude Code input. Its
+  `get_git_repo_name()` fallback runs at most once per render and only when a
+  `repo` placeholder is present, so keep it behind `repo_fields()` instead of
+  resolving it eagerly in `main()`.
 
 ## Change map
 

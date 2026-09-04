@@ -931,7 +931,9 @@ class TestGetUsageData(unittest.TestCase):
 
 
 # ── 16. TestMainIntegration ────────────────────────────────────────────────────
-class TestMainIntegration(unittest.TestCase):
+class MainIntegrationTestCase(unittest.TestCase):
+    """main() を stdin JSON から実行する統合テストの共通土台。"""
+
     _USAGE = {
         "five_hour_pct": 42,
         "seven_day_pct": 60,
@@ -964,6 +966,8 @@ class TestMainIntegration(unittest.TestCase):
                                     cnl.main()
                                 return captured.getvalue()
 
+
+class TestMainIntegration(MainIntegrationTestCase):
     def test_default_mode(self):
         input_data = {
             "model": {"display_name": "claude-sonnet-4"},
@@ -2498,7 +2502,9 @@ class TestGetGitRepoName(unittest.TestCase):
         return mock_result
 
     def test_absolute_git_common_dir(self):
-        with patch.object(cnl.subprocess, "run", return_value=self._mock_run(0, "/home/user/MyRepo/.git\n")) as mock_run:
+        with patch.object(
+            cnl.subprocess, "run", return_value=self._mock_run(0, "/home/user/MyRepo/.git\n")
+        ) as mock_run:
             self.assertEqual(cnl.get_git_repo_name("/home/user/MyRepo"), "MyRepo")
         # worktree でも本体リポジトリ名になる挙動は --git-common-dir に依存するため、
         # 引数とタイムアウトをテストで固定する
@@ -2515,7 +2521,9 @@ class TestGetGitRepoName(unittest.TestCase):
 
     def test_worktree_returns_main_repo_name(self):
         # worktree では --git-common-dir が本体リポジトリの .git を指す
-        with patch.object(cnl.subprocess, "run", return_value=self._mock_run(0, "/home/user/MyRepo/.git\n")) as mock_run:
+        with patch.object(
+            cnl.subprocess, "run", return_value=self._mock_run(0, "/home/user/MyRepo/.git\n")
+        ) as mock_run:
             self.assertEqual(cnl.get_git_repo_name("/home/user/worktrees/slots/root"), "MyRepo")
         # worktree のパスがそのまま `git -C` に渡ることを固定する
         mock_run.assert_called_once_with(
@@ -2660,19 +2668,11 @@ class TestRepoPlaceholders(unittest.TestCase):
 
 
 # ── main() integration for {repo} 系 ───────────────────────────────────────────
-class TestRepoMainIntegration(unittest.TestCase):
-    def _run_main(self, input_data, fmt):
-        import io
+class TestRepoMainIntegration(MainIntegrationTestCase):
+    _USAGE = {}
 
-        with patch("sys.stdin", io.StringIO(json.dumps(input_data))):
-            with patch.object(cnl, "get_usage_data", return_value={}):
-                with patch.object(cnl, "get_git_branch", return_value="main"):
-                    with patch.object(cnl, "get_git_dirty", return_value=False):
-                        with patch.dict(os.environ, {"CLAUDE_NANO_LINE_FORMAT": fmt}, clear=False):
-                            captured = io.StringIO()
-                            with patch("sys.stdout", captured):
-                                cnl.main()
-                            return strip_ansi(captured.getvalue())
+    def _render_main(self, input_data, fmt):
+        return strip_ansi(self._run_main(input_data, env={"CLAUDE_NANO_LINE_FORMAT": fmt}))
 
     def test_workspace_repo_is_used(self):
         input_data = {
@@ -2683,7 +2683,7 @@ class TestRepoMainIntegration(unittest.TestCase):
             },
         }
         with patch.object(cnl, "get_git_repo_name") as mock_repo:
-            out = self._run_main(input_data, "{repo_full}")
+            out = self._render_main(input_data, "{repo_full}")
             mock_repo.assert_not_called()
         self.assertEqual(out, "HappyOnigiri/ClaudeNanoLine")
 
@@ -2693,7 +2693,7 @@ class TestRepoMainIntegration(unittest.TestCase):
             "workspace": {"current_dir": "/home/user/project"},
         }
         with patch.object(cnl, "get_git_repo_name", return_value="MyRepo"):
-            out = self._run_main(input_data, "{repo}|{repo_owner}")
+            out = self._render_main(input_data, "{repo}|{repo_owner}")
         self.assertEqual(out, "MyRepo|")
 
     def test_non_dict_workspace_repo_falls_back(self):
@@ -2702,7 +2702,7 @@ class TestRepoMainIntegration(unittest.TestCase):
             "workspace": {"current_dir": "/home/user/project", "repo": "github.com/HappyOnigiri/ClaudeNanoLine"},
         }
         with patch.object(cnl, "get_git_repo_name", return_value="MyRepo"):
-            out = self._run_main(input_data, "{repo}")
+            out = self._render_main(input_data, "{repo}")
         self.assertEqual(out, "MyRepo")
 
 

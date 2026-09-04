@@ -2498,8 +2498,16 @@ class TestGetGitRepoName(unittest.TestCase):
         return mock_result
 
     def test_absolute_git_common_dir(self):
-        with patch.object(cnl.subprocess, "run", return_value=self._mock_run(0, "/home/user/MyRepo/.git\n")):
+        with patch.object(cnl.subprocess, "run", return_value=self._mock_run(0, "/home/user/MyRepo/.git\n")) as mock_run:
             self.assertEqual(cnl.get_git_repo_name("/home/user/MyRepo"), "MyRepo")
+        # worktree でも本体リポジトリ名になる挙動は --git-common-dir に依存するため、
+        # 引数とタイムアウトをテストで固定する
+        mock_run.assert_called_once_with(
+            ["git", "-C", "/home/user/MyRepo", "rev-parse", "--git-common-dir"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
 
     def test_relative_git_common_dir_resolved_against_cwd(self):
         with patch.object(cnl.subprocess, "run", return_value=self._mock_run(0, ".git\n")):
@@ -2507,8 +2515,15 @@ class TestGetGitRepoName(unittest.TestCase):
 
     def test_worktree_returns_main_repo_name(self):
         # worktree では --git-common-dir が本体リポジトリの .git を指す
-        with patch.object(cnl.subprocess, "run", return_value=self._mock_run(0, "/home/user/MyRepo/.git\n")):
+        with patch.object(cnl.subprocess, "run", return_value=self._mock_run(0, "/home/user/MyRepo/.git\n")) as mock_run:
             self.assertEqual(cnl.get_git_repo_name("/home/user/worktrees/slots/root"), "MyRepo")
+        # worktree のパスがそのまま `git -C` に渡ることを固定する
+        mock_run.assert_called_once_with(
+            ["git", "-C", "/home/user/worktrees/slots/root", "rev-parse", "--git-common-dir"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
 
     def test_failure(self):
         with patch.object(cnl.subprocess, "run", return_value=self._mock_run(128)):

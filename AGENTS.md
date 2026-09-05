@@ -72,6 +72,3 @@ Read only the guide relevant to the area being changed:
   placeholders, options, themes, command tokens, and rendering behavior.
 - [`docs/usage-data.md`](docs/usage-data.md): Usage API, credentials, cache,
   error states, and macOS authentication repair.
-- [`.github/workflows/run-refix.yml`](.github/workflows/run-refix.yml): read its
-  file header before changing the Refix workflow; it contains the template
-  ownership and modification policy.

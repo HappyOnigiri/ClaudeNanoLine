@@ -20,13 +20,12 @@ install:
 	else \
 		original="{}"; \
 	fi; \
-	updated=$$(printf '%s' "$$original" | STATUS_LINE_ENTRY='$(STATUS_LINE_ENTRY)' python3 -c " \
-import json, sys, os; \
+	updated=$$(printf '%s' "$$original" | STATUS_LINE_ENTRY='$(STATUS_LINE_ENTRY)' python3 -c "import json, sys, os; \
 orig = json.loads(sys.stdin.read()); \
 patch = json.loads(os.environ['STATUS_LINE_ENTRY']); \
 orig.setdefault('statusLine', {}).update(patch.get('statusLine', {})); \
 print(json.dumps(orig, indent=2)) \
-"); \
+") || exit 1; \
 	printf '%s\n' "$$updated" > "$(SETTINGS_FILE)"; \
 	echo "Updated $(SETTINGS_FILE)"
 
